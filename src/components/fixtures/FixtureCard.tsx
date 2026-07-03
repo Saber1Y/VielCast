@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import { TxLineBadge } from "@/components/ui/TxLineBadge";
 import { teamCode } from "@/lib/teams";
 
@@ -15,6 +16,40 @@ type Fixture = {
   roomCount?: number;
 };
 
+function StatusBadge({
+  status,
+  minute,
+  startDate,
+}: {
+  status: string;
+  minute?: string;
+  startDate: string;
+}) {
+  if (status === "live") {
+    return (
+      <span className="status-pill border border-white/10 text-zinc-300">
+        <span className="bg-red-500 animate-pulse rounded-full" />
+        {minute ?? "Live"}
+      </span>
+    );
+  }
+
+  if (status === "finished") {
+    return (
+      <span className="status-pill border border-white/10 text-zinc-500">
+        <span className="bg-zinc-500 rounded-full" />
+        Final
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-[10px] font-mono text-zinc-600 flex items-center gap-1">
+      <CountdownTimer targetDate={startDate} />
+    </span>
+  );
+}
+
 export function FixtureCard({
   fixture,
   variant = "default",
@@ -28,27 +63,6 @@ export function FixtureCard({
   const isLive = fixture.status === "live";
   const isFinished = fixture.status === "finished";
   const isUpcoming = fixture.status === "upcoming" || fixture.status === "scheduled";
-
-  const statusBadge = isLive ? (
-    <span className="status-pill border border-white/10 text-zinc-300">
-      <span className="bg-red-500 animate-pulse rounded-full" />
-      {fixture.minute ?? "Live"}
-    </span>
-  ) : isFinished ? (
-    <span className="status-pill border border-white/10 text-zinc-500">
-      <span className="bg-zinc-500 rounded-full" />
-      Final
-    </span>
-  ) : (
-    <span className="text-[10px] font-mono text-zinc-600">
-      {new Date(fixture.startDate).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })}
-    </span>
-  );
 
   const showScore = isLive || isFinished;
 
@@ -89,7 +103,11 @@ export function FixtureCard({
               ) : (
                 <span className="text-sm text-zinc-500">vs</span>
               )}
-              {statusBadge}
+              <StatusBadge
+                status={fixture.status}
+                minute={fixture.minute}
+                startDate={fixture.startDate}
+              />
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
@@ -147,7 +165,11 @@ export function FixtureCard({
           ) : (
             <span className="text-xs text-zinc-500">vs</span>
           )}
-          {statusBadge}
+          <StatusBadge
+            status={fixture.status}
+            minute={fixture.minute}
+            startDate={fixture.startDate}
+          />
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
@@ -165,7 +187,6 @@ export function FixtureCard({
           </div>
         </div>
 
-        {/* Status-based action badge */}
         <div className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium ${
           isUpcoming
             ? "bg-green-accent/10 text-green-accent"
