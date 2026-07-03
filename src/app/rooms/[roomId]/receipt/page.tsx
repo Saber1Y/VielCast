@@ -303,7 +303,7 @@ export default function ReceiptPage() {
                     <span className={`text-[10px] font-mono ${isWinner ? "text-green-accent" : "text-red-400"}`}>
                       {p.side}
                     </span>
-                    <span className="text-xs text-zinc-600">{(p.amount * receipt.entryFee / 1e9).toFixed(4)}</span>
+                    <span className="text-xs text-zinc-600">{(p.amount * receipt.entryFee / 1e9).toFixed(6)}</span>
                     <span className={`text-[10px] ${isWinner ? (p.claimed ? "text-green-accent" : "text-amber-400") : "text-zinc-700"}`}>
                       {isWinner ? (p.claimed ? "Claimed" : "Won") : "Lost"}
                     </span>
@@ -345,7 +345,7 @@ export default function ReceiptPage() {
                     )}
                   </div>
                   <span className="text-sm font-semibold text-green-accent">
-                    {(p.amount / 1e9).toFixed(4)} SOL
+                    {(p.amount / 1e9).toFixed(6)} SOL
                   </span>
                 </div>
               );

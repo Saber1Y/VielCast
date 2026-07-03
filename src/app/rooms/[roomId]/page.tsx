@@ -205,35 +205,44 @@ export default function RoomDetailPage() {
     setError(null);
     try {
       // Phase 1: Build unsigned claim tx
+      console.log("[claim] phase 1: building tx for", wallet.slice(0, 8));
       const res = await fetch(`/api/rooms/${roomId}/claim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ wallet }),
       });
       const data = await res.json();
+      console.log("[claim] phase 1 response:", data);
       if (data.error) { setError(data.error); return; }
 
-      // Phase 2: Sign and send with wallet
+      // Phase 2: Sign with Phantom (just sign, don't send)
+      console.log("[claim] phase 2: signing tx");
       const tx = Transaction.from(Buffer.from(data.tx, "base64"));
       tx.feePayer = new PublicKey(wallet);
 
       const provider = (window as any).phantom?.solana || (window as any).solana;
       if (!provider) { setError("Phantom not detected"); return; }
-      const { signature: txSig } = await provider.signAndSendTransaction(tx);
+      console.log("[claim] phantom rpcUrl:", provider._rpcUrl || provider.rpcUrl || "unknown");
+      const signedTx = await provider.signTransaction(tx);
+      console.log("[claim] tx signed by wallet");
 
-      // Phase 3: Confirm on server
-      const confirmRes = await fetch(`/api/rooms/${roomId}/claim`, {
+      // Phase 3: Server sends payout from admin keypair
+      console.log("[claim] phase 3: submitting claim");
+      const submitRes = await fetch(`/api/rooms/${roomId}/claim/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet, txSig }),
+        body: JSON.stringify({ wallet }),
       });
-      const confirmData = await confirmRes.json();
-      if (confirmData.error) { setError(confirmData.error); return; }
+      const submitData = await submitRes.json();
+      console.log("[claim] phase 3 response:", submitData);
+      if (submitData.error) { setError(submitData.error); return; }
 
-      setRoom(confirmData);
+      setRoom(submitData);
     } catch (e: any) {
       console.error("[claim] error:", e);
-      setError(e?.message ?? "Failed to claim");
+      if (e?.message) console.error("[claim] error.message:", e.message);
+      if (e?.logs) console.error("[claim] error.logs:", e.logs);
+      setError(e?.message ?? "Failed to claim — check console (F12)");
     } finally {
       setClaiming(false);
     }

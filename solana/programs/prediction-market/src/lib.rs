@@ -306,29 +306,21 @@ pub mod prediction_market {
         let payout = participant.amount.checked_mul(2).ok_or(MarketError::Overflow)?;
 
         // Verify vault has enough SOL
-        let vault_balance = ctx.accounts.market.to_account_info().lamports();
+        let market_info = ctx.accounts.market.to_account_info();
+        let vault_balance = market_info.lamports();
         require!(vault_balance >= payout, MarketError::Overflow);
 
-        // Transfer from market PDA vault to claimer
-        let seeds = &[
-            b"market",
-            market.creator.as_ref(),
-            &market.fixture_id.to_le_bytes(),
-            &[market.bump],
-        ];
-        let signer_seeds = &[&seeds[..]];
+        // Transfer lamports directly (PDA has data, so system_program::transfer won't work)
+        **market_info.try_borrow_mut_lamports()? = market_info
+            .lamports()
+            .checked_sub(payout)
+            .ok_or(MarketError::Overflow)?;
 
-        system_program::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.system_program.to_account_info(),
-                system_program::Transfer {
-                    from: ctx.accounts.market.to_account_info(),
-                    to: ctx.accounts.claimer.to_account_info(),
-                },
-                signer_seeds,
-            ),
-            payout,
-        )?;
+        let claimer_info = ctx.accounts.claimer.to_account_info();
+        **claimer_info.try_borrow_mut_lamports()? = claimer_info
+            .lamports()
+            .checked_add(payout)
+            .ok_or(MarketError::Overflow)?;
 
         participant.claimed = true;
 

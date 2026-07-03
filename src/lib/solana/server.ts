@@ -104,10 +104,9 @@ export class PredictionMarketServerSDK {
     const [market] = this.marketPda(fixtureId);
     const [participant] = participantPda(PROGRAM_ID, market, claimerWallet);
 
-    const ix = await this.program.methods
-      .claimPayout()
-      .accounts({ claimer: claimerWallet, market, participant, systemProgram: SystemProgram.programId })
-      .instruction();
+    const ix = this.program.instruction.claimPayout(
+      { accounts: { claimer: claimerWallet, market, participant, systemProgram: SystemProgram.programId } },
+    );
 
     const tx = new Transaction().add(ix);
     tx.feePayer = claimerWallet;

@@ -45,7 +45,12 @@ export async function POST(
       tx: Buffer.from(tx.serialize({ verifySignatures: false })).toString("base64"),
     });
   } catch (err) {
+    console.error("[claim/route] error:", err);
+    if (err instanceof Error) {
+      console.error("[claim/route] message:", err.message);
+      console.error("[claim/route] stack:", err.stack);
+    }
     const msg = err instanceof Error ? err.message : "Claim failed";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg, details: err instanceof Error ? err.message : "unknown" }, { status: 500 });
   }
 }
