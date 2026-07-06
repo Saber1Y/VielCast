@@ -12,6 +12,7 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "ProofPlay World Cup",
   description: "Verifiable World Cup prediction rooms powered by TxLINE",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({
