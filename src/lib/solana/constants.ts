@@ -4,7 +4,7 @@ export const PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_PROGRAM_ID || "D254EggCVsZ7jKtJJ29diEv3P4qqjn5APBAvcRwDNsyE"
 );
 
-export const DEVNET_RPC = "https://api.devnet.solana.com";
+export const DEVNET_RPC = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 export function marketPda(
   programId: PublicKey,

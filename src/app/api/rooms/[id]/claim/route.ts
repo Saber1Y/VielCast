@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const room = getRoom(id);
+  const room = await getRoom(id);
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
   }
@@ -25,7 +25,7 @@ export async function POST(
 
     // Phase 2: Confirm the claim with a txSig
     if (txSig) {
-      const updated = markClaimed(id, wallet);
+      const updated = await markClaimed(id, wallet);
       if (!updated) {
         return NextResponse.json({
           error: "Claim failed — you may not be a winner or already claimed",

@@ -6,7 +6,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const room = getRoom(id);
+  const room = await getRoom(id);
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
   }
@@ -18,7 +18,7 @@ export async function POST(
       return NextResponse.json({ error: "wallet, side, amount, and txSig required" }, { status: 400 });
     }
 
-    const result = addConfirmedParticipant(id, { wallet, side, amount, joinTx: txSig });
+    const result = await addConfirmedParticipant(id, { wallet, side, amount, joinTx: txSig });
     if (!result) {
       return NextResponse.json({ error: "Room is no longer open" }, { status: 400 });
     }

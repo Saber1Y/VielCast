@@ -132,13 +132,18 @@ export class PredictionMarketServerSDK {
 
 export function getServerSDK(): PredictionMarketServerSDK {
   if (_sdk) return _sdk;
+  _sdk = new PredictionMarketServerSDK(loadAdminKeypair());
+  return _sdk;
+}
 
+function loadAdminKeypair(): Keypair {
+  if (process.env.ADMIN_KEYPAIR_SECRET) {
+    const decoded = Buffer.from(process.env.ADMIN_KEYPAIR_SECRET, "base64");
+    return Keypair.fromSecretKey(decoded);
+  }
   const keypairPath = process.env.ADMIN_KEYPAIR_PATH
     ? path.resolve(process.env.ADMIN_KEYPAIR_PATH)
     : path.resolve("solana/admin-keypair.json");
   const secret = JSON.parse(fs.readFileSync(keypairPath, "utf-8"));
-  const keypair = Keypair.fromSecretKey(Buffer.from(secret));
-
-  _sdk = new PredictionMarketServerSDK(keypair);
-  return _sdk;
+  return Keypair.fromSecretKey(Buffer.from(secret));
 }

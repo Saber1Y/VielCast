@@ -5,12 +5,24 @@ import { DEVNET_RPC } from "@/lib/solana/constants";
 import fs from "fs";
 import path from "path";
 
+function loadAdminKeypair(): Keypair {
+  if (process.env.ADMIN_KEYPAIR_SECRET) {
+    const decoded = Buffer.from(process.env.ADMIN_KEYPAIR_SECRET, "base64");
+    return Keypair.fromSecretKey(decoded);
+  }
+  const keypairPath = process.env.ADMIN_KEYPAIR_PATH
+    ? path.resolve(process.env.ADMIN_KEYPAIR_PATH)
+    : path.resolve("solana/admin-keypair.json");
+  const secret = JSON.parse(fs.readFileSync(keypairPath, "utf-8"));
+  return Keypair.fromSecretKey(Buffer.from(secret));
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const room = getRoom(id);
+  const room = await getRoom(id);
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
   }
@@ -36,12 +48,7 @@ export async function POST(
     const payoutLamports = participant.amount * room.entryFee * 2;
     const claimerWallet = new PublicKey(walletStr);
 
-    // Send payout from admin keypair
-    const keypairPath = process.env.ADMIN_KEYPAIR_PATH
-      ? path.resolve(process.env.ADMIN_KEYPAIR_PATH)
-      : path.resolve("solana/admin-keypair.json");
-    const secret = JSON.parse(fs.readFileSync(keypairPath, "utf-8"));
-    const adminKeypair = Keypair.fromSecretKey(Buffer.from(secret));
+    const adminKeypair = loadAdminKeypair();
 
     const connection = new Connection(DEVNET_RPC, "confirmed");
     const { blockhash } = await connection.getLatestBlockhash();
@@ -62,7 +69,7 @@ export async function POST(
     console.log("[claim/submit] payout sent:", txSig, payoutLamports / 1e9, "SOL");
 
     // Mark claimed off-chain
-    const updated = markClaimed(id, walletStr);
+    const updated = await markClaimed(id, walletStr);
     if (!updated) {
       return NextResponse.json({
         error: "Claim failed — you may not be a winner or already claimed",

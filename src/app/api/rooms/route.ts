@@ -8,7 +8,7 @@ import { ensureTxLINEInit } from "@/lib/txline/server-init";
 import { canCreateRoom } from "@/lib/txline/status";
 
 export async function GET() {
-  const rooms = listRooms();
+  const rooms = await listRooms();
   return NextResponse.json(rooms);
 }
 
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         resolved: "CLAIMABLE",
       };
       const reconstructedStatus: string = statusMap[Object.keys(onChain.status)[0]?.toLowerCase()] ?? "OPEN";
-      const room = createRoom({
+      const room = await createRoom({
         fixtureId, homeTeam, awayTeam,
         marketType: onChainMarketType,
         threshold: onChainThreshold,
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     const txSig = await sdk.initializeMarket(fixtureId, marketType, threshold);
 
-    const room = createRoom({
+    const room = await createRoom({
       fixtureId, homeTeam, awayTeam, marketType, threshold, entryFee, wallet,
       marketPda: marketPda.toBase58(),
       initializeTx: txSig,

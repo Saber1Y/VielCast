@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const room = getRoom(id);
+  const room = await getRoom(id);
   if (!room) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
   }
@@ -30,7 +30,7 @@ export async function POST(
     ensureTxLINEInit();
 
     if (room.status === "LOCKED") {
-      setAwaitingProof(id);
+      await setAwaitingProof(id);
     }
 
     const snapshot = await getScoreSnapshot(room.fixtureId);
@@ -78,7 +78,7 @@ export async function POST(
         .map((p) => ({ participant: p.wallet, amount: p.amount * room.entryFee * 2 })),
     };
 
-    const settled = settleRoom(id, winnerSide, receipt, settleTx);
+    const settled = await settleRoom(id, winnerSide, receipt, settleTx);
     if (!settled) {
       return NextResponse.json({ error: "Failed to settle room" }, { status: 500 });
     }
