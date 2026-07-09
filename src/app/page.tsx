@@ -60,12 +60,12 @@ export default async function Home() {
                 />
               </svg>
             </Link>
-            {/* <Link
-              href="/rooms"
+            <Link
+              href="/docs"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-sm font-medium text-zinc-300 transition-all hover:bg-white/5"
             >
-              Watch Demo
-            </Link> */}
+              Documentation
+            </Link>
           </div>
         </div>
         <div className="flex-1">
@@ -177,6 +177,17 @@ export default async function Home() {
               </div>
             </div>
           ))}
+        </div>
+        <div className="mt-6 text-center">
+          <Link
+            href="/docs"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-accent hover:text-cyan-300 transition-colors"
+          >
+            Read the technical docs
+            <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none">
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </Link>
         </div>
       </section>
 
