@@ -6,10 +6,12 @@ async function getLiveFixtures() {
   try {
     const now = new Date();
     const fixtures = await getSportsDataProvider().getLiveMatches();
-    return fixtures.filter((fixture) => {
-      const startDate = new Date(fixture.startDate).getTime();
-      return startDate <= now.getTime();
-    });
+    return fixtures
+      .filter((fixture) => {
+        const startDate = new Date(fixture.startDate).getTime();
+        return startDate <= now.getTime();
+      })
+      .map((fixture) => ({ ...fixture, competition: fixture.leagueName }));
   } catch {
     return [];
   }
