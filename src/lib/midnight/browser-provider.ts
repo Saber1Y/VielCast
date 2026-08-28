@@ -15,7 +15,8 @@ import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-p
 import { setNetworkId, type NetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import type { ConnectedAPI, InitialAPI } from "@midnight-ntwrk/dapp-connector-api";
 import type { UnboundTransaction } from "@midnight-ntwrk/midnight-js-types";
-import { catchError, concatMap, filter, firstValueFrom, interval, map, take, throwError, timeout } from "rxjs";
+import { firstValueFrom, interval, throwError } from "rxjs";
+import { catchError, concatMap, filter, map, take, timeout } from "rxjs/operators";
 import { pipe } from "fp-ts/function";
 import semver from "semver";
 import type { MarketCircuitKeys, MarketProviders } from "../../../contracts/src/market-api";
