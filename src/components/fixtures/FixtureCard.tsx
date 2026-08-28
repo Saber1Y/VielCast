@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
-import { TxLineBadge } from "@/components/ui/TxLineBadge";
 import { teamCode } from "@/lib/teams";
 
 type Fixture = {
@@ -75,7 +74,9 @@ export function FixtureCard({
               {fixture.competition}
             </span>
             {isLive && (
-              <TxLineBadge status="active" />
+              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-600">
+                Sportmonks
+              </span>
             )}
           </div>
 
