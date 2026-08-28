@@ -10,8 +10,8 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "ProofPlay World Cup",
-  description: "Verifiable World Cup prediction rooms powered by TxLINE",
+  title: "VeilCast",
+  description: "Private prediction markets with verifiable sports outcomes",
   icons: { icon: "/favicon.svg" },
 };
 
