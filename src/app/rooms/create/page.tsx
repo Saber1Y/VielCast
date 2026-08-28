@@ -1,11 +1,13 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
 import Link from "next/link";
 import { teamCode } from "@/lib/teams";
 import { GlassCard } from "@/components/ui/GlassCard";
+import {
+  useMidnightMarket,
+} from "@/lib/midnight/use-midnight-market";
 
 interface Fixture {
   id: number;
@@ -15,50 +17,48 @@ interface Fixture {
   competition: string;
 }
 
-const MARKET_TYPES = [
-  {
-    id: "TOTAL_GOALS_OVER_UNDER",
-    name: "Goal Rush",
-    desc: "Will the match have 3+ goals?",
-    rule: "YES wins if total goals are 3 or more. NO wins if 2 or fewer.",
-    statKeys: "1 (Team A goals) + 2 (Team B goals)",
-  },
-  {
-    id: "MATCH_WINNER",
-    name: "Winner Pick",
-    desc: "Who wins the match?",
-    rule: "Pick the winning team. Draw counts as a third option.",
-    statKeys: "Winner stat from TxLINE",
-  },
-];
-
 const STEPS = [
   { num: 1, label: "Match" },
-  { num: 2, label: "Type" },
+  { num: 2, label: "Prediction" },
   { num: 3, label: "Settings" },
-  { num: 4, label: "Verify" },
+  { num: 4, label: "Deploy" },
 ];
+
+function toHex(bytes: Uint8Array | null): string {
+  if (!bytes) return "";
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 function CreateRoomForm() {
   const searchParams = useSearchParams();
   const fixtureId = searchParams.get("fixtureId");
-  const template = searchParams.get("template");
-  const { ready, authenticated, user, login } = usePrivy();
+  const {
+    connected,
+    status,
+    error: walletError,
+    walletAddress,
+    connect,
+    deployMarket,
+  } = useMidnightMarket();
 
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [selectedFixture, setSelectedFixture] = useState<string>(
-    fixtureId || "",
-  );
-  const [marketType, setMarketType] = useState<string>(
-    "TOTAL_GOALS_OVER_UNDER",
-  );
+  const [selectedFixture, setSelectedFixture] = useState<string>(fixtureId || "");
+  const [side, setSide] = useState<"OVER" | "UNDER">("OVER");
   const [threshold, setThreshold] = useState<string>("3");
-  const [entryFee, setEntryFee] = useState<string>("0.01");
+  const [entryFee, setEntryFee] = useState<string>("10");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
-
-  const wallet = user?.wallet?.address ?? "";
+  const [deployedInfo, setDeployedInfo] = useState<{
+    contractAddress: string;
+    resolverHash: string;
+    deployTx: string;
+    deadline: number;
+    marketId: string;
+    roomId: string;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/txline/fixtures")
@@ -67,25 +67,58 @@ function CreateRoomForm() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (template === "Goal Rush") {
-      setMarketType("TOTAL_GOALS_OVER_UNDER");
-      setThreshold("3");
-    } else if (template === "Winner Pick") {
-      setMarketType("MATCH_WINNER");
-    }
-  }, [template]);
-
   const selected = fixtures.find((f) => f.id === Number(selectedFixture));
   const homeCode = teamCode(selected?.homeTeam ?? "");
   const awayCode = teamCode(selected?.awayTeam ?? "");
-  const marketDef = MARKET_TYPES.find((m) => m.id === marketType);
+
+  const kickoffMs = selected ? new Date(selected.startDate).getTime() : 0;
+  const deadline = kickoffMs > 0 ? Math.floor(kickoffMs / 1000) + 7200 : 0;
+
+  const [marketId] = useMemo(() => {
+    const base = `veilcast:${selectedFixture}:${threshold}`;
+    return [
+      toHex(new TextEncoder().encode(base.slice(0, 31))) || base,
+    ] as const;
+  }, [selectedFixture, threshold]);
+
+  async function sha256(input: Uint8Array): Promise<Uint8Array> {
+    const digest = await crypto.subtle.digest("SHA-256", input as unknown as BufferSource);
+    return new Uint8Array(digest);
+  }
 
   async function handleCreate() {
-    if (!selectedFixture || !wallet || !selected) return;
+    if (!selected || !connected) return;
     setCreating(true);
     setError(null);
     try {
+      const marketIdBytes = await sha256(
+        new TextEncoder().encode(`veilcast:${selected.id}:${threshold}:${side}`),
+      );
+
+      const deadlineDigits = BigInt(deadline || Math.floor(Date.now() / 1000) + 86400);
+
+      const resolverSecret = crypto.getRandomValues(new Uint8Array(32));
+      const salt = crypto.getRandomValues(new Uint8Array(32));
+
+      const { resolverCommitment } = await import("../../../../contracts/src/witnesses");
+      const resolverHashBytes = resolverCommitment(resolverSecret);
+
+      const stake = BigInt(Math.round(Number(entryFee) * 1e6));
+
+      // Deploy the market contract on Midnight Preprod and submit the creator's position.
+      const deployed = await deployMarket({
+        marketId: marketIdBytes,
+        deadline: deadlineDigits,
+        resolver: resolverHashBytes,
+        position: { side: side === "OVER", stake, salt },
+        resolverSecret,
+      });
+
+      const contractAddress = deployed.contractAddress;
+      if (!contractAddress) throw new Error("Deploy succeeded but no contract address was returned");
+
+      const deployTx = String((deployed.deployedContract.deployTxData.public as any).txId ?? "");
+
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,20 +126,34 @@ function CreateRoomForm() {
           fixtureId: selected.id,
           homeTeam: selected.homeTeam,
           awayTeam: selected.awayTeam,
-          marketType,
+          marketType: "TOTAL_GOALS_OVER_UNDER",
           threshold: Number(threshold),
           entryFee: Math.round(Number(entryFee) * 1e9),
-          wallet,
+          wallet: walletAddress ?? "",
+          midnightContract: contractAddress,
+          resolverHash: toHex(resolverHashBytes),
+          deployTx,
+          deadline,
+          creatorSide: side,
+          creatorStake: 1,
         }),
       });
       const room = await res.json();
       if (room.error) {
         setError(room.error);
-      } else {
-        window.location.href = `/rooms/${room.id}`;
+        return;
       }
-    } catch {
-      setError("Failed to create room");
+      setDeployedInfo({
+        roomId: room.id,
+        contractAddress,
+        resolverHash: toHex(resolverHashBytes),
+        deployTx,
+        deadline,
+        marketId: toHex(marketIdBytes),
+      });
+    } catch (e) {
+      console.error("[create] deploy error:", e);
+      setError(e instanceof Error ? e.message : "Failed to deploy market");
     } finally {
       setCreating(false);
     }
@@ -121,7 +168,71 @@ function CreateRoomForm() {
     if (step > 1) setStep(step - 1);
   }
 
-  if (!ready) {
+  if (deployedInfo) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <GlassCard className="p-6" hover={false}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-accent/15">
+              <svg className="h-5 w-5 text-green-accent" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">Market Deployed</h1>
+              <p className="text-xs text-zinc-500">
+                Your private prediction market is live on Midnight Preprod.
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-4 rounded-xl border border-cyan-accent/20 bg-cyan-accent/5 p-4">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-cyan-accent">Contract</span>
+              <span className="font-mono text-cyan-300">
+                {deployedInfo.contractAddress.slice(0, 10)}...
+                {deployedInfo.contractAddress.slice(-4)}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="text-zinc-500">Market ID</span>
+              <span className="font-mono text-zinc-400">
+                {deployedInfo.marketId.slice(0, 10)}...{deployedInfo.marketId.slice(-4)}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="text-zinc-500">Resolver hash</span>
+              <span className="font-mono text-zinc-400">
+                {deployedInfo.resolverHash.slice(0, 10)}...
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="text-zinc-500">Lock deadline</span>
+              <span className="font-mono text-zinc-400">
+                {new Date(deployedInfo.deadline * 1000).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          <div className="mb-5 text-xs text-zinc-500">
+            Your position was committed privately on-chain - nobody can see your side or stake until you reveal it at claim time.
+          </div>
+
+          <Link
+            href={`/rooms/${deployedInfo.roomId}`}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-accent px-6 py-3 text-sm font-semibold text-pitch transition-colors hover:bg-green-accent/90"
+          >
+            View Room
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  if (status === "connecting") {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-green-accent border-t-transparent" />
@@ -129,20 +240,26 @@ function CreateRoomForm() {
     );
   }
 
-  if (!authenticated || !wallet) {
+  if (!connected) {
     return (
       <div className="mx-auto max-w-md py-24 text-center">
         <div className="glass-strong rounded-xl p-8">
-          <h1 className="text-xl font-bold">Connect Your Wallet</h1>
+          <h1 className="text-xl font-bold">Connect Midnight Wallet</h1>
           <p className="mt-2 text-sm text-zinc-500">
-            You need to connect a wallet to create a prediction room.
+            VeilCast deploys a private prediction market on Midnight. Open the Lace browser extension to connect your wallet.
           </p>
           <button
-            onClick={login}
+            onClick={() => connect().catch((e) => setError(e instanceof Error ? e.message : "Connection failed"))}
             className="mt-6 rounded-lg bg-green-accent px-6 py-2.5 text-sm font-semibold text-pitch transition-colors hover:bg-green-accent/90"
           >
-            Connect Wallet
+            Connect with Lace
           </button>
+          {walletError && (
+            <p className="mt-3 text-xs text-red-400">{walletError}</p>
+          )}
+          <p className="mt-4 text-[10px] text-zinc-600">
+            Midnight (Preprod) · Lace wallet 4.x
+          </p>
         </div>
       </div>
     );
@@ -168,9 +285,9 @@ function CreateRoomForm() {
 
       <div className="mb-6">
         <span className="section-header">Create</span>
-        <h1 className="text-2xl font-bold">Prediction Room</h1>
+        <h1 className="text-2xl font-bold">Private Prediction Market</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Set up a room for friends. All predictions settle via TxLINE on-chain.
+          Deploy a private market on Midnight. Your prediction is committed hidden on-chain and revealed only at claim time.
         </p>
       </div>
 
@@ -229,9 +346,7 @@ function CreateRoomForm() {
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-accent/20 text-[10px] font-bold text-green-accent">
                 1
               </span>
-              <span className="text-sm font-medium text-white">
-                Select Match
-              </span>
+              <span className="text-sm font-medium text-white">Select Match</span>
             </div>
 
             <select
@@ -263,13 +378,9 @@ function CreateRoomForm() {
                   )}
                 </div>
                 <div className="flex-1 text-sm">
-                  <span className="font-medium text-zinc-200">
-                    {selected.homeTeam}
-                  </span>
+                  <span className="font-medium text-zinc-200">{selected.homeTeam}</span>
                   <span className="mx-2 text-zinc-600">vs</span>
-                  <span className="font-medium text-zinc-200">
-                    {selected.awayTeam}
-                  </span>
+                  <span className="font-medium text-zinc-200">{selected.awayTeam}</span>
                 </div>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold">
                   {awayCode ? (
@@ -287,116 +398,108 @@ function CreateRoomForm() {
           </GlassCard>
         )}
 
-        {/* Step 2: Prediction Type */}
+        {/* Step 2: Prediction */}
         {step === 2 && (
           <GlassCard className="p-5" hover={false}>
             <div className="mb-3 flex items-center gap-2">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-accent/20 text-[10px] font-bold text-green-accent">
                 2
               </span>
-              <span className="text-sm font-medium text-white">
-                Prediction Type
-              </span>
+              <span className="text-sm font-medium text-white">Your Prediction</span>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {MARKET_TYPES.map((mt) => (
-                <button
-                  key={mt.id}
-                  onClick={() => {
-                    setMarketType(mt.id);
-                    if (mt.id === "TOTAL_GOALS_OVER_UNDER") setThreshold("3");
-                  }}
-                  className={`rounded-xl border p-4 text-left transition-all ${
-                    marketType === mt.id
-                      ? "border-green-accent/40 bg-green-accent/5"
-                      : "border-white/5 bg-white/[0.02] hover:border-white/10"
-                  }`}
-                >
-                  <h3 className="text-sm font-semibold text-white">
-                    {mt.name}
-                  </h3>
-                  <p className="mt-1 text-xs text-zinc-500">{mt.desc}</p>
-                  {marketType === mt.id && (
-                    <p className="mt-2 text-[10px] leading-relaxed text-zinc-600">
-                      {mt.rule}
-                    </p>
-                  )}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setSide("OVER")}
+                className={`rounded-xl border p-4 text-center transition-all ${
+                  side === "OVER"
+                    ? "border-green-accent/40 bg-green-accent/10 text-green-accent"
+                    : "border-white/10 text-zinc-400 hover:border-white/20"
+                }`}
+              >
+                <div className="text-sm font-semibold">OVER {threshold}+</div>
+                <div className="mt-1 text-[10px] text-zinc-500">Total goals above the mark</div>
+              </button>
+              <button
+                onClick={() => setSide("UNDER")}
+                className={`rounded-xl border p-4 text-center transition-all ${
+                  side === "UNDER"
+                    ? "border-red-500/40 bg-red-500/10 text-red-400"
+                    : "border-white/10 text-zinc-400 hover:border-white/20"
+                }`}
+              >
+                <div className="text-sm font-semibold">UNDER {threshold}</div>
+                <div className="mt-1 text-[10px] text-zinc-500">Total goals at or below the mark</div>
+              </button>
             </div>
+
+            <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
+              Your side and stake are hidden. On-chain you only appear as an anonymous commitment - the market will know
+              you joined, but not what you picked until claim time.
+            </p>
           </GlassCard>
         )}
 
-        {/* Step 3: Room Settings */}
+        {/* Step 3: Settings */}
         {step === 3 && (
           <GlassCard className="p-5" hover={false}>
             <div className="mb-3 flex items-center gap-2">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-accent/20 text-[10px] font-bold text-green-accent">
                 3
               </span>
-              <span className="text-sm font-medium text-white">
-                Room Settings
-              </span>
+              <span className="text-sm font-medium text-white">Market Settings</span>
             </div>
 
             <div className="flex flex-col gap-4">
               <div>
-                <label className="mb-1 block text-xs text-zinc-500">
-                  Goal Threshold
-                </label>
+                <label className="mb-1 block text-xs text-zinc-500">Goal Threshold</label>
                 <input
                   type="number"
                   step="1"
                   value={threshold}
                   onChange={(e) => setThreshold(e.target.value)}
                   className="glass-input w-full px-3 py-2 text-sm"
-                  disabled={marketType !== "TOTAL_GOALS_OVER_UNDER"}
                 />
                 <p className="mt-1 text-[10px] text-zinc-600">
-                  {marketType === "TOTAL_GOALS_OVER_UNDER"
-                    ? `YES wins if total goals >= ${threshold}. NO wins if total goals < ${threshold}.`
-                    : "Threshold only applies to Goal Rush."}
+                  OVER wins if total goals &gt; {threshold}. UNDER wins if total goals &lt;= {threshold}.
                 </p>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-zinc-500">
-                  Entry Fee (SOL)
-                </label>
+                <label className="mb-1 block text-xs text-zinc-500">Entry Stake (USDC)</label>
                 <input
                   type="number"
-                  step="0.001"
-                  min="0.001"
+                  step="1"
+                  min="1"
                   value={entryFee}
                   onChange={(e) => setEntryFee(e.target.value)}
                   className="glass-input w-full px-3 py-2 text-sm"
                 />
                 <p className="mt-1 text-[10px] text-zinc-600">
-                  Each participant pays this amount per entry. Winner claims 2x their stake from the pool.
+                  Staked privately per entry. Winner claims 2x their stake from the pool. Kept hidden until claim.
                 </p>
               </div>
 
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-4">
-                <h4 className="text-xs font-medium text-zinc-300 mb-2">
-                  Room Rules
-                </h4>
+                <h4 className="mb-2 text-xs font-medium text-zinc-300">Market Rules</h4>
                 <div className="grid grid-cols-2 gap-2 text-[10px]">
                   <div>
-                    <span className="text-zinc-600">Entry fee</span>
-                    <div className="font-mono text-zinc-400">{entryFee || "0.01"} SOL</div>
+                    <span className="text-zinc-600">Stake</span>
+                    <div className="font-mono text-zinc-400">{entryFee || "10"} USDC</div>
                   </div>
                   <div>
-                    <span className="text-zinc-600">Max participants</span>
-                    <div className="font-mono text-zinc-400">Unlimited</div>
+                    <span className="text-zinc-600">Network</span>
+                    <div className="font-mono text-zinc-400">Midnight Preprod</div>
                   </div>
                   <div>
                     <span className="text-zinc-600">Closes at</span>
-                    <div className="font-mono text-zinc-400">Kickoff</div>
+                    <div className="font-mono text-zinc-400">
+                      {selected ? new Date(selected.startDate).toLocaleString() : "Kickoff"}
+                    </div>
                   </div>
                   <div>
-                    <span className="text-zinc-600">Visibility</span>
-                    <div className="font-mono text-zinc-400">Public</div>
+                    <span className="text-zinc-600">Privacy</span>
+                    <div className="font-mono text-zinc-400">ZK commitment</div>
                   </div>
                 </div>
               </div>
@@ -404,81 +507,70 @@ function CreateRoomForm() {
           </GlassCard>
         )}
 
-        {/* Step 4: Verification Preview */}
-        {step === 4 && selected && marketDef && (
+        {/* Step 4: Deploy Preview */}
+        {step === 4 && selected && (
           <GlassCard className="p-5" hover={false}>
             <div className="mb-3 flex items-center gap-2">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-accent/20 text-[10px] font-bold text-green-accent">
                 4
               </span>
-              <span className="text-sm font-medium text-white">
-                Verification Preview
-              </span>
+              <span className="text-sm font-medium text-white">Deploy Preview</span>
             </div>
 
             <div className="glass mb-4 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-white">
                 {selected.homeTeam} vs {selected.awayTeam}
               </h3>
-              <p className="mt-1 text-xs text-zinc-500">{marketDef.name}</p>
-              <p className="mt-1 text-xs text-zinc-400">{marketDef.rule}</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                OVER {threshold}+ / UNDER {threshold} · {entryFee} USDC stake
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                <span className="text-zinc-600">Entry Fee</span>
-                <div className="mt-0.5 font-mono text-zinc-300">
-                  {entryFee} SOL
-                </div>
+                <span className="text-zinc-600">Your side</span>
+                <div className="mt-0.5 font-mono text-zinc-300">{side}</div>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
                 <span className="text-zinc-600">Resolution Source</span>
-                <div className="mt-0.5 font-medium text-cyan-accent">
-                  TxLINE Score Feed
-                </div>
+                <div className="mt-0.5 font-medium text-cyan-accent">Sportmonks final score</div>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                <span className="text-zinc-600">Stat Keys Used</span>
-                <div className="mt-0.5 font-mono text-zinc-300">
-                  {marketDef.statKeys}
-                </div>
+                <span className="text-zinc-600">On-chain</span>
+                <div className="mt-0.5 font-mono text-zinc-300">Midnight Preprod</div>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                <span className="text-zinc-600">Settlement Rule</span>
-                <div className="mt-0.5 font-mono text-zinc-300">
-                  {marketType === "TOTAL_GOALS_OVER_UNDER"
-                    ? `total_goals >= ${threshold}`
-                    : "winner"}
-                </div>
+                <span className="text-zinc-600">Answer reveal</span>
+                <div className="mt-0.5 font-mono text-zinc-300">ZK at claim</div>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                <span className="text-zinc-600">Verification</span>
-                <div className="mt-0.5 text-zinc-300">TxLINE + Solana</div>
+                <span className="text-zinc-600">Market ID</span>
+                <div className="mt-0.5 font-mono text-zinc-400">{marketId.slice(0, 12)}...</div>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                <span className="text-zinc-600">Lock deadline</span>
+                <div className="mt-0.5 font-mono text-zinc-400">
+                  {deadline ? new Date(deadline * 1000).toLocaleString() : "-"}
+                </div>
               </div>
             </div>
 
-            {/* Win condition examples */}
-            {marketType === "TOTAL_GOALS_OVER_UNDER" && (
-              <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                <span className="text-[10px] font-medium text-zinc-500">
-                  Win conditions
-                </span>
-                <div className="mt-2 flex flex-col gap-1 text-[10px]">
-                  <span className="text-green-accent">
-                    YES wins: {threshold}-0, 2-1, 3-0, 2-2, 4-1...
-                  </span>
-                  <span className="text-red-400">
-                    NO wins: 0-0, 1-0, 1-1, 2-0...
-                  </span>
-                </div>
-              </div>
-            )}
+            <div className="mt-4 rounded-lg border border-green-accent/15 bg-green-accent/[0.03] p-3">
+              <span className="text-[10px] font-medium text-green-accent">
+                What happens on deploy
+              </span>
+              <ul className="mt-2 flex flex-col gap-1 text-[10px] leading-relaxed text-zinc-500">
+                <li>1. Lace signs & submits the contract transaction to Midnight Preprod.</li>
+                <li>2. Your position commitment (hidden side + stake) is submitted in a second ZK transaction.</li>
+                <li>3. Your wallet holds the private salt - nothing about your pick is visible on-chain.</li>
+              </ul>
+            </div>
           </GlassCard>
         )}
 
-        {error && (
+        {(error || walletError) && (
           <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
-            {error}
+            {error || walletError}
           </div>
         )}
 
@@ -517,10 +609,10 @@ function CreateRoomForm() {
               {creating ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-pitch border-t-transparent" />
-                  Creating Room...
+                  Deploying Market...
                 </span>
               ) : (
-                "Create Room"
+                "Deploy Private Market"
               )}
             </button>
           )}
