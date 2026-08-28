@@ -117,6 +117,9 @@ function CreateRoomForm() {
       const contractAddress = deployed.contractAddress;
       if (!contractAddress) throw new Error("Deploy succeeded but no contract address was returned");
 
+      const position = { side: side === "OVER", stake, salt };
+      const { saveOwnPosition } = await import("../../../lib/midnight/own-position");
+      saveOwnPosition(contractAddress, position, resolverSecret);
       const deployTx = String((deployed.deployedContract.deployTxData.public as any).txId ?? "");
 
       const res = await fetch("/api/rooms", {
