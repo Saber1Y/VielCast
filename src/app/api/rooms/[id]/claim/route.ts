@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRoom, markClaimed } from "@/lib/rooms/store";
-import { getServerSDK } from "@/lib/solana/server";
-import { PublicKey } from "@solana/web3.js";
 
 export async function POST(
   req: NextRequest,
@@ -18,38 +16,22 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { wallet, txSig } = body;
+    const { wallet } = body;
     if (!wallet) {
       return NextResponse.json({ error: "wallet required" }, { status: 400 });
     }
 
-    // Phase 2: Confirm the claim with a txSig
-    if (txSig) {
-      const updated = await markClaimed(id, wallet);
-      if (!updated) {
-        return NextResponse.json({
-          error: "Claim failed — you may not be a winner or already claimed",
-        }, { status: 400 });
-      }
-      return NextResponse.json(updated);
+    // The winner proves their position on-chain through Lace (commitment + nullifier reveal).
+    // Here we only record the claim.
+    const updated = await markClaimed(id, wallet);
+    if (!updated) {
+      return NextResponse.json({
+        error: "Claim failed — you may not be a winner or already claimed",
+      }, { status: 400 });
     }
-
-    // Phase 1: Build and return unsigned claim transaction
-    const sdk = getServerSDK();
-    const tx = await sdk.buildClaimTransaction(
-      room.fixtureId,
-      new PublicKey(wallet),
-    );
-
-    return NextResponse.json({
-      tx: Buffer.from(tx.serialize({ verifySignatures: false })).toString("base64"),
-    });
+    return NextResponse.json(updated);
   } catch (err) {
     console.error("[claim/route] error:", err);
-    if (err instanceof Error) {
-      console.error("[claim/route] message:", err.message);
-      console.error("[claim/route] stack:", err.stack);
-    }
     const msg = err instanceof Error ? err.message : "Claim failed";
     return NextResponse.json({ error: msg, details: err instanceof Error ? err.message : "unknown" }, { status: 500 });
   }
