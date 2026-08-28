@@ -49,7 +49,7 @@ describe("VeilCast market contract model", () => {
     market.claim(commitment(yesPosition), "yes-nullifier", yesPosition);
     assert.throws(
       () => market.claim(commitment(yesPosition), "yes-nullifier", yesPosition),
-      /already been claimed/,
+      /already claimed/,
     );
     assert.throws(
       () => market.claim(commitment(noPosition), "no-nullifier", noPosition),
