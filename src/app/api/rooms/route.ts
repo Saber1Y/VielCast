@@ -3,8 +3,7 @@ import { createRoom, listRooms } from "@/lib/rooms/store";
 import { getServerSDK } from "@/lib/solana/server";
 import { Connection } from "@solana/web3.js";
 import { DEVNET_RPC } from "@/lib/solana/constants";
-import { getFixtureById } from "@/lib/txline/client";
-import { ensureTxLINEInit } from "@/lib/txline/server-init";
+import { getSportsDataProvider } from "@/lib/sports-data/provider";
 import { canCreateRoom } from "@/lib/txline/status";
 
 export async function GET() {
@@ -21,8 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify the match is upcoming
-    ensureTxLINEInit();
-    const fixture = await getFixtureById(Number(fixtureId));
+    const fixture = await getSportsDataProvider().getFixtureById(Number(fixtureId));
     if (!fixture) {
       return NextResponse.json({ error: "Fixture not found" }, { status: 404 });
     }
