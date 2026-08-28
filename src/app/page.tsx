@@ -1,26 +1,15 @@
 import Link from "next/link";
 import { FixtureCard } from "@/components/fixtures/FixtureCard";
-import { ensureTxLINEInit } from "@/lib/txline/server-init";
-import { getFixtures } from "@/lib/txline/client";
-
-const LIVE_WINDOW_MS = 4 * 60 * 60 * 1000;
-const MATCH_DURATION_BUFFER = 3 * 60 * 60 * 1000;
+import { getSportsDataProvider } from "@/lib/sports-data/provider";
 
 async function getLiveFixtures() {
   try {
-    ensureTxLINEInit();
-    const fixtures = await getFixtures();
-    const now = Date.now();
-    return fixtures
-      .map((f) => {
-        const startDate = new Date(f.startDate).getTime();
-        const elapsed = now - startDate;
-        if (elapsed < 0) return null;
-        if (elapsed >= LIVE_WINDOW_MS) return null;
-        if (elapsed >= MATCH_DURATION_BUFFER) return null;
-        return { ...f, status: "live" as const, homeScore: 0, awayScore: 0 };
-      })
-      .filter((f): f is NonNullable<typeof f> => f !== null);
+    const now = new Date();
+    const fixtures = await getSportsDataProvider().getLiveMatches();
+    return fixtures.filter((fixture) => {
+      const startDate = new Date(fixture.startDate).getTime();
+      return startDate <= now.getTime();
+    });
   } catch {
     return [];
   }
