@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
-import { PublicKey, Transaction } from "@solana/web3.js";
 import Link from "next/link";
 import { teamCode } from "@/lib/teams";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -11,6 +9,8 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { TxLineBadge } from "@/components/ui/TxLineBadge";
 import { ThresholdMeter } from "@/components/rooms/ThresholdMeter";
 import { useLiveScore } from "@/lib/txline/useLiveScore";
+import { useMidnightMarket } from "@/lib/midnight/use-midnight-market";
+import { loadOwnPosition, saveOwnPosition } from "@/lib/midnight/own-position";
 
 interface Participant {
   id: string;
@@ -51,6 +51,10 @@ interface Room {
   winnerSide?: string;
   settlementReceipt?: SettlementReceipt;
   activityLog: ActivityLogEntry[];
+  midnightContract?: string;
+  resolverHash?: string;
+  deployTx?: string;
+  deadline?: number;
   marketPda?: string;
   initializeTx?: string;
   lockTx?: string;
@@ -59,10 +63,34 @@ interface Room {
   cancelReason?: string;
 }
 
+function toBytes(hex: string): Uint8Array {
+  const clean = hex.length % 2 ? `0${hex}` : hex;
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+function randomBytes(n: number): Uint8Array {
+  return crypto.getRandomValues(new Uint8Array(n));
+}
+
 export default function RoomDetailPage() {
   const params = useParams();
   const roomId = params.roomId as string;
-  const { ready, user, login } = usePrivy();
+  const {
+    connected,
+    status,
+    error: walletError,
+    walletAddress,
+    connect,
+    joinByAddress,
+    findByAddress,
+    lockMarket,
+    resolveMarket,
+    claim,
+  } = useMidnightMarket();
 
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,8 +100,9 @@ export default function RoomDetailPage() {
   const [joining, setJoining] = useState(false);
   const [settling, setSettling] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [locking, setLocking] = useState(false);
 
-  const wallet = user?.wallet?.address ?? "";
+  const wallet = walletAddress ?? "";
   const isCreator = room?.createdBy?.toLowerCase() === wallet.toLowerCase();
   const isOverUnder = room?.marketType === "TOTAL_GOALS_OVER_UNDER";
   const isOpen = room?.status === "OPEN";
@@ -83,6 +112,7 @@ export default function RoomDetailPage() {
   const isSettled = room?.status === "SETTLED" || room?.status === "CLAIMABLE";
   const isClaimable = room?.status === "CLAIMABLE";
   const isCancelled = room?.status === "CANCELLED";
+  const isMidnight = Boolean(room?.midnightContract);
 
   const myParticipant = room?.participants.find(
     (p) => p.wallet.toLowerCase() === wallet.toLowerCase()
@@ -116,39 +146,28 @@ export default function RoomDetailPage() {
   }, [roomId]);
 
   async function handleJoin() {
-    if (!wallet || !selectedSide) return;
+    if (!connected || !wallet || !room?.midnightContract || !selectedSide) return;
     setJoining(true);
     setError(null);
     try {
-      // Step 1: Build unsigned transaction
-      const res = await fetch(`/api/rooms/${roomId}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet, side: selectedSide, amount: Number(amount) }),
-      });
-      const data = await res.json();
-      if (data.error) { setError(data.error); return; }
+      // On-chain: submit a hidden position commitment through Lace.
+      const contract = room.midnightContract;
+      const stakePerEntry = BigInt(Math.round(room.entryFee / 1e3));
+      const position = {
+        side: selectedSide === "OVER",
+        stake: stakePerEntry * BigInt(Math.max(1, Math.floor(Number(amount)))),
+        salt: randomBytes(32),
+      };
+      const resolverSecret = randomBytes(32);
 
-      const { tx: txBase64 } = data;
+      await joinByAddress(contract, position, resolverSecret);
+      saveOwnPosition(contract, position, resolverSecret);
 
-      // Step 2: Sign and send with wallet (triggers native wallet prompt)
-      const tx = Transaction.from(Buffer.from(txBase64, "base64"));
-      tx.feePayer = new PublicKey(wallet);
-
-      console.log("[join] signing tx, programIDs:", tx.instructions.map(i => i.programId.toBase58()));
-      const provider = (window as any).phantom?.solana || (window as any).solana;
-      if (!provider) { setError("Phantom not detected — please install Phantom wallet"); return; }
-      console.log("[join] phantom provider rpcUrl:", provider._rpcUrl || provider.rpcUrl || "unknown");
-      console.log("[join] phantom provider isConnected:", provider.isConnected);
-      console.log("[join] phantom provider publicKey:", provider.publicKey?.toBase58());
-      const { signature: txSig } = await provider.signAndSendTransaction(tx);
-      console.log("[join] tx signed:", txSig.slice(0, 20));
-
-      // Step 3: Confirm on server — creates participant + stores txSig
+      // Off-chain: record the participant.
       const confirmRes = await fetch(`/api/rooms/${roomId}/join/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet, side: selectedSide, amount: Number(amount), txSig }),
+        body: JSON.stringify({ wallet, side: selectedSide, amount: Number(amount) }),
       });
       const confirmData = await confirmRes.json();
       if (confirmData.error) { setError(confirmData.error); return; }
@@ -162,21 +181,66 @@ export default function RoomDetailPage() {
     }
   }
 
+  async function handleLock() {
+    if (!connected || !room?.midnightContract) return;
+    setLocking(true);
+    setError(null);
+    try {
+      const own = loadOwnPosition(room.midnightContract);
+      if (!own) {
+        setError("Your resolver secret is only available in the session that created this room.");
+        return;
+      }
+      await findByAddress(room.midnightContract, own.position, own.resolverSecret);
+      await lockMarket();
+      const res = await fetch(`/api/rooms/${roomId}/lock`, { method: "POST" });
+      if (!res.ok) { setError((await res.json()).error); return; }
+      setRoom(await res.json());
+    } catch (e: any) {
+      console.error("[lock] error:", e);
+      setError(e?.message ?? "Failed to lock the market on-chain");
+    } finally {
+      setLocking(false);
+    }
+  }
+
   async function handleSettle() {
-    if (!wallet) return;
+    if (!connected || !wallet || !room?.midnightContract) return;
     setSettling(true);
     setError(null);
     try {
+      // Phase 1: fetch the Sportmonks final result + winner + result anchor.
       const res = await fetch(`/api/rooms/${roomId}/settle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ wallet }),
       });
       const data = await res.json();
-      if (data.error) setError(data.error);
-      else setRoom(data);
-    } catch {
-      setError("Failed to settle");
+      if (data.error) { setError(data.error); return; }
+
+      const own = loadOwnPosition(room.midnightContract);
+      if (!own) {
+        setError("Only the creator's wallet (with the resolver secret) can settle this room.");
+        return;
+      }
+
+      // On-chain: resolve as YES(1) / NO(2) with the result anchor.
+      await findByAddress(room.midnightContract, own.position, own.resolverSecret);
+      const outcome = data.winnerSide === "OVER" || data.winnerSide === "HOME" ? 1 : 2;
+      await resolveMarket(outcome, toBytes(data.resultHash));
+
+      // Phase 2: record the settlement receipt.
+      const confirm = await fetch(`/api/rooms/${roomId}/settle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet, onChain: true }),
+      });
+      const confirmData = await confirm.json();
+      if (confirmData.error) { setError(confirmData.error); return; }
+      setRoom(confirmData);
+    } catch (e: any) {
+      console.error("[settle] error:", e);
+      setError(e?.message ?? "Failed to settle — check console (F12)");
     } finally {
       setSettling(false);
     }
@@ -200,48 +264,30 @@ export default function RoomDetailPage() {
   }
 
   async function handleClaim() {
-    if (!wallet) return;
+    if (!connected || !room?.midnightContract) return;
     setClaiming(true);
     setError(null);
     try {
-      // Phase 1: Build unsigned claim tx
-      console.log("[claim] phase 1: building tx for", wallet.slice(0, 8));
+      const own = loadOwnPosition(room.midnightContract);
+      if (!own) {
+        setError("Your position secret is only available in the session where you joined.");
+        return;
+      }
+      // On-chain: reveal your commitment + nullifier (proves you won the resolved side).
+      await findByAddress(room.midnightContract, own.position, own.resolverSecret);
+      await claim(randomBytes(32), own.position);
+
+      // Off-chain: record the claim.
       const res = await fetch(`/api/rooms/${roomId}/claim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ wallet }),
       });
       const data = await res.json();
-      console.log("[claim] phase 1 response:", data);
       if (data.error) { setError(data.error); return; }
-
-      // Phase 2: Sign with Phantom (just sign, don't send)
-      console.log("[claim] phase 2: signing tx");
-      const tx = Transaction.from(Buffer.from(data.tx, "base64"));
-      tx.feePayer = new PublicKey(wallet);
-
-      const provider = (window as any).phantom?.solana || (window as any).solana;
-      if (!provider) { setError("Phantom not detected"); return; }
-      console.log("[claim] phantom rpcUrl:", provider._rpcUrl || provider.rpcUrl || "unknown");
-      const signedTx = await provider.signTransaction(tx);
-      console.log("[claim] tx signed by wallet");
-
-      // Phase 3: Server sends payout from admin keypair
-      console.log("[claim] phase 3: submitting claim");
-      const submitRes = await fetch(`/api/rooms/${roomId}/claim/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet }),
-      });
-      const submitData = await submitRes.json();
-      console.log("[claim] phase 3 response:", submitData);
-      if (submitData.error) { setError(submitData.error); return; }
-
-      setRoom(submitData);
+      setRoom(data);
     } catch (e: any) {
       console.error("[claim] error:", e);
-      if (e?.message) console.error("[claim] error.message:", e.message);
-      if (e?.logs) console.error("[claim] error.logs:", e.logs);
       setError(e?.message ?? "Failed to claim — check console (F12)");
     } finally {
       setClaiming(false);
@@ -263,11 +309,24 @@ export default function RoomDetailPage() {
     );
   }
 
-  if (error || !room) {
+  if (error && !room) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <div className="glass-strong rounded-xl p-6">
-          <p className="text-sm text-red-400 mb-4">{error || "Room not found"}</p>
+          <p className="text-sm text-red-400 mb-4">{error}</p>
+          <Link href="/rooms" className="text-xs font-medium text-cyan-accent hover:text-cyan-300">
+            Back to rooms →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="glass-strong rounded-xl p-6">
+          <p className="text-sm text-red-400 mb-4">Room not found</p>
           <Link href="/rooms" className="text-xs font-medium text-cyan-accent hover:text-cyan-300">
             Back to rooms →
           </Link>
@@ -351,12 +410,12 @@ export default function RoomDetailPage() {
           {/* Awaiting proof */}
           {isAwaitingProof && (
             <GlassCard className="p-5" hover={false}>
-              <span className="section-header mb-3 block">Awaiting Proof</span>
+              <span className="section-header mb-3 block">Awaiting Resolution</span>
               <div className="flex items-center justify-center py-4">
                 <div className="text-center">
                   <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-cyan-accent border-t-transparent" />
-                  <p className="text-sm text-zinc-400">Match finished. Fetching TxLINE validation proof...</p>
-                  <p className="mt-1 text-xs text-zinc-600">Anyone can trigger settlement once proof is ready</p>
+                  <p className="text-sm text-zinc-400">Match finished. The creator resolves the market on-chain...</p>
+                  <p className="mt-1 text-xs text-zinc-600">The final Sportmonks score is anchored as a hash at resolve time.</p>
                 </div>
               </div>
             </GlassCard>
@@ -417,10 +476,10 @@ export default function RoomDetailPage() {
                     </span>
                   </div>
                   <div className="text-2xl font-bold text-white">
-                    {(yesPool * (room.entryFee || 0) / 1e9).toFixed(6)}
+                    {(yesPool * (room.entryFee || 0) / 1e9).toFixed(4)}
                   </div>
                   <div className="text-[10px] text-zinc-600">
-                    SOL · {room.participants.filter((p) => p.side === "OVER" || p.side === "HOME").length} participant{room.participants.filter((p) => p.side === "OVER" || p.side === "HOME").length !== 1 ? "s" : ""}
+                    USDC · {room.participants.filter((p) => p.side === "OVER" || p.side === "HOME").length} participant{room.participants.filter((p) => p.side === "OVER" || p.side === "HOME").length !== 1 ? "s" : ""}
                   </div>
                 </div>
                 <div className="rounded-xl border border-red-500/20 bg-red-500/[0.03] p-4">
@@ -431,10 +490,10 @@ export default function RoomDetailPage() {
                     </span>
                   </div>
                   <div className="text-2xl font-bold text-white">
-                    {(noPool * (room.entryFee || 0) / 1e9).toFixed(6)}
+                    {(noPool * (room.entryFee || 0) / 1e9).toFixed(4)}
                   </div>
                   <div className="text-[10px] text-zinc-600">
-                    SOL · {room.participants.filter((p) => p.side === "UNDER" || p.side === "AWAY").length} participant{room.participants.filter((p) => p.side === "UNDER" || p.side === "AWAY").length !== 1 ? "s" : ""}
+                    USDC · {room.participants.filter((p) => p.side === "UNDER" || p.side === "AWAY").length} participant{room.participants.filter((p) => p.side === "UNDER" || p.side === "AWAY").length !== 1 ? "s" : ""}
                   </div>
                 </div>
               </div>
@@ -457,19 +516,8 @@ export default function RoomDetailPage() {
                       <div className="flex items-center gap-2">
                         <span className={`h-1.5 w-1.5 rounded-full ${isYes ? "bg-green-accent" : "bg-red-400"}`} />
                         <span className="text-xs font-mono text-zinc-400">
-                          {p.wallet.slice(0, 6)}...{p.wallet.slice(-4)}
+                          {p.wallet.slice(0, 8)}...{p.wallet.slice(-4)}
                         </span>
-                        {p.joinTx && (
-                          <a
-                            href={`https://solscan.io/tx/${p.joinTx}?cluster=devnet`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="ml-1 text-[10px] text-blue-400/60 hover:text-blue-400"
-                            title="View on Solscan"
-                          >
-                            tx
-                          </a>
-                        )}
                         {isWinner && p.claimed && (
                           <span className="text-[10px] text-green-accent/60">Claimed</span>
                         )}
@@ -479,7 +527,7 @@ export default function RoomDetailPage() {
                           {p.side}
                         </span>
                         <span className="text-xs text-zinc-600">
-                          {(p.amount * (room.entryFee || 0) / 1e9).toFixed(6)}
+                          {(p.amount * (room.entryFee || 0) / 1e9).toFixed(4)} USDC
                         </span>
                       </div>
                     </div>
@@ -513,18 +561,22 @@ export default function RoomDetailPage() {
         {/* Right column: Join + Actions */}
         <div className="flex flex-col gap-4">
           {/* Wallet guard */}
-          {!wallet && (
+          {!connected && (
             <GlassCard className="p-5" hover={false}>
-              <span className="section-header mb-3 block">Wallet Required</span>
+              <span className="section-header mb-3 block">Privacy Wallet Required</span>
               <p className="text-sm text-zinc-500">
-                Connect your wallet to join rooms, settle, claim payouts, and manage predictions.
+                Connect a Midnight (Lace) wallet to join rooms, lock, settle, and claim with ZK proofs.
               </p>
               <button
-                onClick={() => login()}
-                className="mt-3 w-full rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 transition-colors"
+                onClick={() => connect().catch((e) => setError(e instanceof Error ? e.message : "Connection failed"))}
+                disabled={status === "connecting"}
+                className="mt-3 w-full rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 transition-colors disabled:opacity-50"
               >
-                Connect Wallet
+                {status === "connecting" ? "Connecting..." : "Connect with Lace"}
               </button>
+              {walletError && (
+                <p className="mt-2 text-xs text-red-400">{walletError}</p>
+              )}
             </GlassCard>
           )}
           {/* Already joined info */}
@@ -533,7 +585,7 @@ export default function RoomDetailPage() {
               <span className="section-header mb-3 block">You've Joined</span>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-zinc-400">Side: <span className="font-mono text-zinc-300">{myParticipant.side}</span></span>
-                <span className="text-zinc-400">Staked: <span className="font-mono text-zinc-300">{(myParticipant.amount * (room.entryFee || 0) / 1e9).toFixed(4)} SOL</span></span>
+                <span className="text-zinc-400">Staked: <span className="font-mono text-zinc-300">{(myParticipant.amount * (room.entryFee || 0) / 1e9).toFixed(4)} USDC</span></span>
               </div>
             </GlassCard>
           )}
@@ -543,7 +595,7 @@ export default function RoomDetailPage() {
             <GlassCard className="p-5" hover={false}>
               <span className="section-header mb-3 block">Join Room</span>
 
-              {!wallet ? (
+              {!connected ? (
                 <p className="text-sm text-zinc-500">
                   Connect your wallet to join this prediction room.
                 </p>
@@ -560,7 +612,7 @@ export default function RoomDetailPage() {
                         }`}
                       >
                         <div className="text-sm font-semibold">YES</div>
-                        <div className="text-[10px] text-zinc-600">3+ goals</div>
+                        <div className="text-[10px] text-zinc-600">{room.threshold}+ goals</div>
                       </button>
                       <button
                         onClick={() => setSelectedSide("UNDER")}
@@ -571,7 +623,7 @@ export default function RoomDetailPage() {
                         }`}
                       >
                         <div className="text-sm font-semibold">NO</div>
-                        <div className="text-[10px] text-zinc-600">2 or fewer</div>
+                        <div className="text-[10px] text-zinc-600">{room.threshold} or fewer</div>
                       </button>
                     </div>
                   ) : (
@@ -608,11 +660,11 @@ export default function RoomDetailPage() {
                         disabled={joining || !selectedSide}
                         className="ml-auto rounded-lg bg-green-accent px-4 py-2 text-xs font-semibold text-pitch transition-all hover:bg-green-accent/90 disabled:opacity-50"
                       >
-                        {joining ? "Joining..." : "Join"}
+                        {joining ? "Proving..." : "Join"}
                       </button>
                     </div>
                     <p className="text-[10px] text-zinc-600">
-                      Total: <span className="font-mono text-zinc-400">{(Number(amount) * (room.entryFee || 0) / 1e9).toFixed(4)} SOL</span>
+                      Total: <span className="font-mono text-zinc-400">{(Number(amount) * (room.entryFee || 0) / 1e9).toFixed(4)} USDC</span>
                       &nbsp;·&nbsp; Winner gets <span className="font-mono text-zinc-400">2x</span>
                     </p>
                   </div>
@@ -627,13 +679,11 @@ export default function RoomDetailPage() {
             <div className="flex flex-col gap-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-zinc-600">Data source</span>
-                <span className="font-medium text-cyan-accent">TxLINE</span>
+                <span className="font-medium text-cyan-accent">Sportmonks</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-zinc-600">Stat keys</span>
-                <span className="font-mono text-zinc-300">
-                  {isOverUnder ? "1 + 2" : "winner"}
-                </span>
+                <span className="text-zinc-600">Privacy</span>
+                <span className="font-mono text-zinc-300">ZK commitment</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-zinc-600">Rule</span>
@@ -642,25 +692,22 @@ export default function RoomDetailPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-zinc-600">Settlement</span>
-                <span className="text-zinc-300">Automatic</span>
+                <span className="text-zinc-600">Chain</span>
+                <span className="text-zinc-300">Midnight Preprod</span>
               </div>
             </div>
           </GlassCard>
 
-          {wallet && (
+          {connected && (
             <>
               {/* Lock button (creator only) */}
               {isOpen && isCreator && (
                 <button
-                  onClick={async () => {
-                    const res = await fetch(`/api/rooms/${roomId}/lock`, { method: "POST" });
-                    if (res.ok) setRoom(await res.json());
-                    else setError((await res.json()).error);
-                  }}
-                  className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
+                  onClick={handleLock}
+                  disabled={locking}
+                  className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
                 >
-                  Lock Room (Kickoff)
+                  {locking ? "Locking on-chain..." : "Lock Room (Kickoff)"}
                 </button>
               )}
 
@@ -674,10 +721,10 @@ export default function RoomDetailPage() {
                   {settling ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="h-3 w-3 animate-spin rounded-full border-2 border-pitch border-t-transparent" />
-                      Settling...
+                      Resolving on-chain...
                     </span>
                   ) : isAwaitingProof ? (
-                    "Retry Proof Fetch & Settle"
+                    "Retry Fetch & Resolve"
                   ) : (
                     "Settle Room"
                   )}
@@ -727,10 +774,20 @@ export default function RoomDetailPage() {
             </Link>
           )}
 
-          {/* Tx explorer links */}
+          {/* Contract info */}
           <div className="flex flex-col gap-1.5 text-[10px] text-zinc-600">
             <div className="font-mono">Room #{room.id}</div>
-            {room.initializeTx && (
+            {isMidnight && room.midnightContract && (
+              <div className="truncate font-mono text-zinc-500" title={room.midnightContract}>
+                contract: {room.midnightContract.slice(0, 16)}...
+              </div>
+            )}
+            {isMidnight && room.deployTx && (
+              <div className="truncate font-mono text-zinc-500" title={room.deployTx}>
+                deploy tx: {room.deployTx.slice(0, 16)}...
+              </div>
+            )}
+            {!isMidnight && room.initializeTx && (
               <a
                 href={`https://explorer.solana.com/tx/${room.initializeTx}?cluster=devnet`}
                 target="_blank"
@@ -738,26 +795,6 @@ export default function RoomDetailPage() {
                 className="text-zinc-500 hover:text-zinc-300 transition-colors"
               >
                 init: {room.initializeTx.slice(0, 12)}...
-              </a>
-            )}
-            {room.lockTx && (
-              <a
-                href={`https://explorer.solana.com/tx/${room.lockTx}?cluster=devnet`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                lock: {room.lockTx.slice(0, 12)}...
-              </a>
-            )}
-            {room.settleTx && (
-              <a
-                href={`https://explorer.solana.com/tx/${room.settleTx}?cluster=devnet`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                settle: {room.settleTx.slice(0, 12)}...
               </a>
             )}
           </div>
