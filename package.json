@@ -11,6 +11,15 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@midnight-ntwrk/dapp-connector-api": "4.0.1",
+    "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
+    "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
+    "@midnight-ntwrk/midnight-js-types": "4.1.1",
+    "@midnight-ntwrk/midnight-js-utils": "4.1.1",
     "@privy-io/react-auth": "^3.32.2",
     "@solana-program/memo": "0.10.0",
     "@solana/spl-token": "^0.4.14",
@@ -24,7 +33,10 @@
     "next": "^15.3.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "fp-ts": "^2.16.11",
+    "pino": "^10.3.1",
+    "semver": "^7.7.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.4",
