@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRoom, listRooms } from "@/lib/rooms/store";
-import { getServerSDK } from "@/lib/solana/server";
-import { Connection } from "@solana/web3.js";
-import { DEVNET_RPC } from "@/lib/solana/constants";
+import { addConfirmedParticipant, createRoom, listRooms, getRoom } from "@/lib/rooms/store";
 import { getSportsDataProvider } from "@/lib/sports-data/provider";
 import { canCreateRoom } from "@/lib/txline/status";
 
@@ -14,8 +11,25 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { fixtureId, homeTeam, awayTeam, marketType, threshold, entryFee, wallet } = body;
-    if (!fixtureId || !homeTeam || !awayTeam || !marketType || threshold === undefined || !entryFee || !wallet) {
+    const {
+      fixtureId,
+      homeTeam,
+      awayTeam,
+      marketType,
+      threshold,
+      entryFee,
+      wallet,
+      midnightContract,
+      resolverHash,
+      deployTx,
+      deadline,
+      creatorSide,
+      creatorStake,
+    } = body;
+    if (
+      !fixtureId || !homeTeam || !awayTeam || !marketType ||
+      threshold === undefined || !entryFee || !wallet
+    ) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -33,60 +47,47 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const sdk = getServerSDK();
-    const [marketPda] = sdk.marketPda(fixtureId);
-
-    // Check if market PDA already exists on-chain — reconstruct room from on-chain data
-    const connection = new Connection(DEVNET_RPC, "confirmed");
-    const accountInfo = await connection.getAccountInfo(marketPda);
-    if (accountInfo) {
-      const onChain = await sdk.fetchMarket(fixtureId);
-      const onChainFixture = Number(onChain.fixtureId);
-      if (onChainFixture !== fixtureId) {
-        return NextResponse.json({ error: "On-chain fixture ID mismatch" }, { status: 409 });
-      }
-      const onChainMarketType = Object.keys(onChain.marketType)[0] || marketType;
-      const onChainThreshold = Number(onChain.threshold);
-      const statusMap: Record<string, string> = {
-        open: "OPEN",
-        locked: "LOCKED",
-        resolved: "CLAIMABLE",
-      };
-      const reconstructedStatus: string = statusMap[Object.keys(onChain.status)[0]?.toLowerCase()] ?? "OPEN";
-      const room = await createRoom({
-        fixtureId, homeTeam, awayTeam,
-        marketType: onChainMarketType,
-        threshold: onChainThreshold,
-        entryFee: entryFee,
-        wallet,
-        marketPda: marketPda.toBase58(),
-        overrideStatus: reconstructedStatus as any,
-      });
-      if (onChain.winnerSide) {
-        const winSide = Object.keys(onChain.winnerSide)[0];
-        room.winnerSide = winSide as any;
-      }
-      return NextResponse.json(room, { status: 201 });
-    }
-
-    const txSig = await sdk.initializeMarket(fixtureId, marketType, threshold);
-
-    const room = await createRoom({
-      fixtureId, homeTeam, awayTeam, marketType, threshold, entryFee, wallet,
-      marketPda: marketPda.toBase58(),
-      initializeTx: txSig,
-    });
-    return NextResponse.json(room, { status: 201 });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Invalid request";
-
-    // Catch the common "already in use" simulation error and return a friendly message
-    if (msg.includes("custom program error: 0x0") || msg.includes("already in use")) {
+    // One active room per fixture (the deployed contract MarketId is derived from the fixture)
+    const existing = await listRooms();
+    const duplicate = existing.find(
+      (r) =>
+        r.fixtureId === Number(fixtureId) &&
+        (r.status === "OPEN" || r.status === "LOCKED" || r.status === "LIVE" || r.status === "AWAITING_PROOF")
+    );
+    if (duplicate) {
       return NextResponse.json({
-        error: "A market for this fixture already exists on-chain. Each fixture can only have one room. Please pick a different fixture from the list.",
+        error: "A room for this fixture already exists. Each fixture can only have one room. Please pick a different fixture from the list.",
       }, { status: 409 });
     }
 
+    const room = await createRoom({
+      fixtureId: Number(fixtureId),
+      homeTeam,
+      awayTeam,
+      marketType,
+      threshold: Number(threshold),
+      entryFee: Number(entryFee),
+      wallet,
+      midnightContract,
+      resolverHash,
+      deployTx,
+      deadline,
+    });
+
+    // The deployer committed their own position on-chain during deploy, so record them here too.
+    if (midnightContract && creatorSide) {
+      await addConfirmedParticipant(room.id, {
+        wallet,
+        side: creatorSide as any,
+        amount: Number(creatorStake ?? 1),
+        joinTx: "deploy",
+      });
+    }
+
+    const created = await getRoom(room.id);
+    return NextResponse.json(created ?? room, { status: 201 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Invalid request";
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }
