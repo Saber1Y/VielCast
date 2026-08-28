@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { getRoom } from "@/lib/rooms/store";
 import { getServerSDK } from "@/lib/solana/server";
-import { getFixtureById } from "@/lib/txline/client";
-import { ensureTxLINEInit } from "@/lib/txline/server-init";
+import { getSportsDataProvider } from "@/lib/sports-data/provider";
 import { canJoinRoom } from "@/lib/txline/status";
 
 export async function POST(
@@ -20,8 +19,7 @@ export async function POST(
   }
 
   // Verify the match is still joinable (upcoming only for MVP)
-  ensureTxLINEInit();
-  const fixture = await getFixtureById(room.fixtureId);
+  const fixture = await getSportsDataProvider().getFixtureById(room.fixtureId);
   if (!fixture || !canJoinRoom(fixture.startDate)) {
     return NextResponse.json({
       error: "This match has already started. Joining is only allowed before kickoff.",
