@@ -17,6 +17,7 @@ export function useMidnightMarket() {
   const [providers, setProviders] = useState<MarketProviders | null>(null);
   const [market, setMarket] = useState<MarketAPI | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   const connect = useCallback(async () => {
     setStatus("connecting");
@@ -26,6 +27,8 @@ export function useMidnightMarket() {
       const wallet = await connectMidnightWallet();
       const configuredProviders = await initializeMidnightProviders(wallet);
       setProviders(configuredProviders);
+      const addresses = await wallet.getShieldedAddresses();
+      setWalletAddress(addresses.shieldedCoinPublicKey);
       setStatus("connected");
       return wallet;
     } catch (cause) {
@@ -80,6 +83,12 @@ export function useMidnightMarket() {
     [providers],
   );
 
+  const joinByAddress = useCallback(
+    async (contractAddress: ContractAddress, position: PrivatePosition, resolverSecret: Uint8Array) =>
+      joinMarket({ contractAddress, position, resolverSecret }),
+    [joinMarket],
+  );
+
   const operateMarket = useCallback(
     async (operation: (api: MarketAPI) => Promise<void>) => {
       if (!market) throw new Error("Deploy or join a market first");
@@ -110,9 +119,11 @@ export function useMidnightMarket() {
     error,
     connected: status === "connected",
     contractAddress: market?.contractAddress ?? null,
+    walletAddress,
     connect,
     deployMarket,
     joinMarket,
+    joinByAddress,
     lockMarket,
     resolveMarket,
     claim,
