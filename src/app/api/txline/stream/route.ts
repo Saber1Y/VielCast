@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getSportsDataProvider } from "@/lib/sports-data/provider";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -7,33 +8,41 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const fixtureId = searchParams.get("fixtureId");
 
-  const baseUrl = process.env.TXLINE_BASE_URL;
-  const jwt = process.env.TXLINE_JWT;
-  const apiToken = process.env.TXLINE_API_TOKEN;
-
-  if (!baseUrl || !jwt || !apiToken) {
-    return new Response("TxLINE not configured", { status: 500 });
+  if (!fixtureId || Number.isNaN(Number(fixtureId))) {
+    return new Response("A valid fixtureId is required", { status: 400 });
   }
 
-  const url = `${baseUrl}/api/scores/stream${
-    fixtureId ? `?fixture_id=${fixtureId}` : ""
-  }`;
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const sendScore = async () => {
+        const fixture = await getSportsDataProvider().getFixtureById(Number(fixtureId));
+        if (!fixture) return;
 
-  const txlineRes = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      "X-Api-Token": apiToken,
-      Accept: "text/event-stream",
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+          fixture_id: fixture.id,
+          seq: Date.now(),
+          status: fixture.status === "live" ? "in_progress" : fixture.status,
+          home_score: fixture.homeScore ?? 0,
+          away_score: fixture.awayScore ?? 0,
+          timestamp: new Date().toISOString(),
+        })}\n\n`));
+      };
+
+      try {
+        while (!req.signal.aborted) {
+          await sendScore();
+          await new Promise((resolve) => setTimeout(resolve, 10_000));
+        }
+      } catch {
+        if (!req.signal.aborted) controller.error();
+      } finally {
+        if (!req.signal.aborted) controller.close();
+      }
     },
   });
 
-  if (!txlineRes.ok) {
-    return new Response(`TxLINE stream error: ${txlineRes.status}`, {
-      status: txlineRes.status,
-    });
-  }
-
-  return new Response(txlineRes.body, {
+  return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
