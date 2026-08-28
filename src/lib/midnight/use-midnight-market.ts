@@ -89,6 +89,21 @@ export function useMidnightMarket() {
     [joinMarket],
   );
 
+  const findByAddress = useCallback(
+    async (contractAddress: ContractAddress, position: PrivatePosition, resolverSecret: Uint8Array) => {
+      if (!providers) throw new Error("Connect a Midnight wallet first");
+      const joined = await MarketAPI.join(
+        providers,
+        contractAddress,
+        position,
+        resolverSecret,
+      );
+      setMarket(joined);
+      return joined;
+    },
+    [providers],
+  );
+
   const operateMarket = useCallback(
     async (operation: (api: MarketAPI) => Promise<void>) => {
       if (!market) throw new Error("Deploy or join a market first");
@@ -124,6 +139,7 @@ export function useMidnightMarket() {
     deployMarket,
     joinMarket,
     joinByAddress,
+    findByAddress,
     lockMarket,
     resolveMarket,
     claim,
