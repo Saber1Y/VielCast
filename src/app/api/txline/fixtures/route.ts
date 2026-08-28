@@ -13,7 +13,12 @@ export async function GET(req: NextRequest) {
       competitionId ? Number(competitionId) : undefined,
     );
 
-    return NextResponse.json(fixtures);
+    return NextResponse.json(
+      fixtures.map((fixture) => ({
+        ...fixture,
+        competition: fixture.leagueName,
+      })),
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to fetch fixtures";
     return NextResponse.json({ error: message }, { status: 500 });
