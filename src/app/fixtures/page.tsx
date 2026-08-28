@@ -68,7 +68,7 @@ export default function FixturesPage() {
         <div className="glass-strong mb-4 rounded-xl p-6">
           <p className="text-sm text-red-400">{error}</p>
           <p className="mt-2 text-xs text-zinc-500">
-            Make sure TXLINE_JWT and TXLINE_API_TOKEN are set in your .env
+             Make sure SPORTMONKS_API_TOKEN is set in your .env
           </p>
         </div>
       </div>
@@ -79,10 +79,10 @@ export default function FixturesPage() {
     <div className="flex flex-col gap-8">
       {/* Page header */}
       <div>
-        <span className="section-header">World Cup</span>
+        <span className="section-header">Live Leagues</span>
         <h1 className="text-2xl font-bold">Fixtures</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          World Cup matches powered by TxLINE
+          Football fixtures powered by Sportmonks
         </p>
       </div>
 
