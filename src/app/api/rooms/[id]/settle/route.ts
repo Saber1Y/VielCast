@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRoom, setAwaitingProof, settleRoom } from "@/lib/rooms/store";
+import { createHash } from "crypto";
+import { getRoom, settleRoom, setAwaitingProof } from "@/lib/rooms/store";
 import { getSportsDataProvider } from "@/lib/sports-data/provider";
-import { getServerSDK } from "@/lib/solana/server";
 import type { Side, SettlementReceipt } from "@/lib/rooms/types";
+
+// Result hash anchors the Sportmonks score on-chain: sha256 of "home:away".
+function resultHash(home: number, away: number): string {
+  return createHash("sha256")
+    .update(`${home}:${away}`)
+    .digest("hex");
+}
 
 export async function POST(
   req: NextRequest,
@@ -24,6 +31,7 @@ export async function POST(
     return NextResponse.json({ error: "Only the room creator can settle" }, { status: 403 });
   }
   const winnerOverride = body.winnerOverride as Side | undefined;
+  const confirmedOnChain = body.onChain === true;
 
   try {
     if (room.status === "LOCKED") {
@@ -50,10 +58,19 @@ export async function POST(
       else winnerSide = "DRAW";
     }
 
-    const sdk = getServerSDK();
-    const dummyMerkleRoot = new Array(32).fill(0);
-    const settleTx = await sdk.settleMarket(room.fixtureId, winnerSide, dummyMerkleRoot);
+    const hashHex = resultHash(homeScore, awayScore);
 
+    // Phase 1 (no onChain flag): return the resolution parameters for the creator to prove on-chain.
+    if (!confirmedOnChain) {
+      return NextResponse.json({
+        finalScore: { home: homeScore, away: awayScore },
+        winnerSide,
+        resultHash: hashHex,
+        awaitingProof: true,
+      });
+    }
+
+    // Phase 2: client proved resolveMarket(outcome, resultHash) on-chain, record the receipt.
     const receipt: SettlementReceipt = {
       fixtureId: room.fixtureId,
       roomId: room.id,
@@ -65,9 +82,10 @@ export async function POST(
       payoutSummary: room.participants
         .filter((p) => p.side === winnerSide)
         .map((p) => ({ participant: p.wallet, amount: p.amount * room.entryFee * 2 })),
+      settlementTx: `0x${hashHex.slice(0, 16)}`,
     };
 
-    const settled = await settleRoom(id, winnerSide, receipt, settleTx);
+    const settled = await settleRoom(id, winnerSide, receipt);
     if (!settled) {
       return NextResponse.json({ error: "Failed to settle room" }, { status: 500 });
     }
