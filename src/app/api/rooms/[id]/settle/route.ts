@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRoom, setAwaitingProof, settleRoom } from "@/lib/rooms/store";
-import { ensureTxLINEInit } from "@/lib/txline/server-init";
-import { getScoreSnapshot } from "@/lib/txline/client";
+import { getSportsDataProvider } from "@/lib/sports-data/provider";
 import { getServerSDK } from "@/lib/solana/server";
 import type { Side, SettlementReceipt } from "@/lib/rooms/types";
 
@@ -27,28 +26,18 @@ export async function POST(
   const winnerOverride = body.winnerOverride as Side | undefined;
 
   try {
-    ensureTxLINEInit();
-
     if (room.status === "LOCKED") {
       await setAwaitingProof(id);
     }
 
-    const snapshot = await getScoreSnapshot(room.fixtureId);
-    if (!snapshot) {
-      return NextResponse.json({ error: "No score data from TxLINE" }, { status: 500 });
+    const fixture = await getSportsDataProvider().getFinalResult(room.fixtureId);
+    if (!fixture || fixture.homeScore === undefined || fixture.awayScore === undefined) {
+      return NextResponse.json({ error: "No final score available from Sportmonks" }, { status: 500 });
     }
 
-    const homeScore = snapshot.home_score;
-    const awayScore = snapshot.away_score;
+    const homeScore = fixture.homeScore;
+    const awayScore = fixture.awayScore;
     const total = homeScore + awayScore;
-
-    const matchFinished = snapshot.status === "finished";
-    if (!matchFinished && room.status === "AWAITING_PROOF") {
-      return NextResponse.json({
-        error: "Match not yet finished. Current status: " + snapshot.status,
-        awaitingProof: true,
-      }, { status: 400 });
-    }
 
     let winnerSide: Side;
     const isOverUnder = room.marketType.toUpperCase().replace(/_/g, "") === "TOTALGOALSOVERUNDER";
@@ -71,7 +60,7 @@ export async function POST(
       marketType: room.marketType,
       threshold: room.threshold,
       finalScore: { home: homeScore, away: awayScore },
-      txlineSeq: snapshot.seq,
+      txlineSeq: fixture.id,
       winnerSide,
       payoutSummary: room.participants
         .filter((p) => p.side === winnerSide)
