@@ -125,6 +125,10 @@ export async function createRoom(data: {
   wallet: string;
   marketPda?: string;
   initializeTx?: string;
+  midnightContract?: string;
+  resolverHash?: string;
+  deployTx?: string;
+  deadline?: number;
   overrideStatus?: Room["status"];
 }): Promise<Room> {
   await init();
@@ -143,6 +147,10 @@ export async function createRoom(data: {
     activityLog: [],
     marketPda: data.marketPda,
     initializeTx: data.initializeTx,
+    midnightContract: data.midnightContract,
+    resolverHash: data.resolverHash,
+    deployTx: data.deployTx,
+    deadline: data.deadline,
   };
   addActivityLog(room, {
     type: "ROOM_CREATED",
