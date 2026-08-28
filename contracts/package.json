@@ -4,6 +4,7 @@
   "scripts": {
     "compile": "compact compile +0.31.1 veilcast-market.compact managed",
     "compile:check": "compact compile +0.31.1 --skip-zk veilcast-market.compact /tmp/veilcast-compact-build",
-    "format": "compact format veilcast-market.compact"
+    "format": "compact format veilcast-market.compact",
+    "test": "tsx --test test/market.test.ts"
   }
 }
