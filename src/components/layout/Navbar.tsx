@@ -17,9 +17,9 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-white/5 bg-pitch/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <img src="/logo.svg" alt="ProofPlay" className="h-6 w-6" />
+          <img src="/logo.svg" alt="VeilCast" className="h-6 w-6" />
           <span className="text-sm font-bold tracking-tight">
-            ProofPlay <span className="text-gradient">World Cup</span>
+            VeilCast <span className="text-gradient">Markets</span>
           </span>
         </Link>
 
