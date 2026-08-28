@@ -25,15 +25,14 @@ export default async function Home() {
       {/* Hero */}
       <section className="flex flex-col items-center gap-10 pt-12 text-center lg:flex-row lg:text-left">
         <div className="flex-1">
-          <span className="section-header mb-3 block">ProofPlay World Cup</span>
+          <span className="section-header mb-3 block">VeilCast Markets</span>
           <h1 className="text-4xl font-bold leading-tight tracking-tight lg:text-5xl">
-            Create World Cup prediction rooms that settle with{" "}
+            Create private prediction markets that settle with{" "}
             <span className="text-gradient">verifiable sports data</span>
           </h1>
           <p className="mt-4 max-w-lg text-sm leading-relaxed text-zinc-400 lg:text-base">
-            ProofPlay Markets uses TxLINE&apos;s real-time World Cup feeds and
-            Solana-verifiable result proofs to resolve fan prediction rooms
-            transparently. No admin override. No guessing.
+            VeilCast uses live league data to resolve fan prediction markets
+            transparently while keeping individual positions private.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
             <Link
@@ -90,7 +89,7 @@ export default async function Home() {
             {
               step: "01",
               title: "Pick a Match",
-              desc: "Choose any World Cup fixture from the TxLINE data feed.",
+              desc: "Choose a live league fixture from the sports data feed.",
               icon: (
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
                   <circle
@@ -137,7 +136,7 @@ export default async function Home() {
             {
               step: "03",
               title: "Verified Settlement",
-              desc: "TxLINE data resolves the room. The proof is anchored on Solana.",
+              desc: "Sports data resolves the market. The result is anchored on-chain.",
               icon: (
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none">
                   <path
