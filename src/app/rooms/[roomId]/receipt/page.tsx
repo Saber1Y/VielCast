@@ -6,7 +6,7 @@ import Link from "next/link";
 import { teamCode } from "@/lib/teams";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TxLineBadge } from "@/components/ui/TxLineBadge";
-import { SolanaBadge } from "@/components/ui/SolanaBadge";
+import { MidnightBadge } from "@/components/ui/MidnightBadge";
 
 interface PayoutSummary {
   participant: string;
@@ -100,11 +100,11 @@ export default function ReceiptPage() {
         <div className="flex items-center gap-2 mb-1">
           <span className="section-header">Settlement Receipt</span>
           <TxLineBadge status="verified" />
-          <SolanaBadge status="verified" />
+          <MidnightBadge status="verified" />
         </div>
         <h1 className="text-2xl font-bold">Room Resolved</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Room settled using TxLINE verified World Cup data
+          Room resolved on Midnight with Sportmonks-verified World Cup data
         </p>
       </div>
 
@@ -174,9 +174,9 @@ export default function ReceiptPage() {
         <span className="section-header mb-4 block">Verification Trail</span>
         <div className="flex items-center gap-3">
           {[
-            { label: "TxLINE Score", status: "completed", step: 1 },
+            { label: "Sportmonks Score", status: "completed", step: 1 },
             { label: "Winner Rule", status: "completed", step: 2 },
-            { label: "Solana Settlement", status: receipt.settlementTx ? "completed" : "active", step: 3 },
+            { label: "Midnight Resolution", status: receipt.settlementTx ? "completed" : "active", step: 3 },
           ].map((v, i) => (
             <>
               <div
@@ -239,16 +239,11 @@ export default function ReceiptPage() {
           </div>
           {receipt.settlementTx && (
             <div className="col-span-2">
-              <span className="text-zinc-600">Settlement Transaction</span>
+              <span className="text-zinc-600">Result Anchor (resolver hash)</span>
               <div className="mt-0.5">
-                <a
-                  href={`https://explorer.solana.com/tx/${receipt.settlementTx}?cluster=devnet`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-xs text-cyan-accent hover:text-cyan-300 transition-colors"
-                >
+                <div className="font-mono text-xs text-cyan-accent truncate" title={receipt.settlementTx}>
                   {receipt.settlementTx}
-                </a>
+                </div>
               </div>
             </div>
           )}
@@ -287,7 +282,7 @@ export default function ReceiptPage() {
                     <span className="text-xs font-mono text-zinc-400">
                       {p.wallet.slice(0, 8)}...{p.wallet.slice(-4)}
                     </span>
-                    {p.joinTx && (
+                    {p.joinTx && p.joinTx !== "midnight" && (
                       <a
                         href={`https://solscan.io/tx/${p.joinTx}?cluster=devnet`}
                         target="_blank"
@@ -345,7 +340,7 @@ export default function ReceiptPage() {
                     )}
                   </div>
                   <span className="text-sm font-semibold text-green-accent">
-                    {(p.amount / 1e9).toFixed(6)} SOL
+                    {(p.amount / 1e9).toFixed(4)} USDC
                   </span>
                 </div>
               );
@@ -383,19 +378,19 @@ export default function ReceiptPage() {
             <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M4 6l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Verified by TxLINE
+          Verified by Sportmonks
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
-          <svg className="h-3 w-3 text-purple-400" viewBox="0 0 12 12" fill="currentColor">
+          <svg className="h-3 w-3 text-emerald-400" viewBox="0 0 12 12" fill="currentColor">
             <circle cx="6" cy="6" r="6" />
           </svg>
-          Anchored on Solana
+          Anchored on Midnight
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
           <svg className="h-3 w-3 text-green-accent" viewBox="0 0 12 12" fill="none">
             <path d="M2.5 6l2.5 2.5L9.5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Settled automatically
+          Resolved by creator ZK
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
           <svg className="h-3 w-3 text-zinc-500" viewBox="0 0 12 12" fill="none">
