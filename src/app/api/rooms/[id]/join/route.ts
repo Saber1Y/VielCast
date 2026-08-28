@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PublicKey } from "@solana/web3.js";
 import { getRoom } from "@/lib/rooms/store";
-import { getServerSDK } from "@/lib/solana/server";
 import { getSportsDataProvider } from "@/lib/sports-data/provider";
 import { canJoinRoom } from "@/lib/txline/status";
 
@@ -41,10 +39,20 @@ export async function POST(
       return NextResponse.json({ error: "You have already joined this room" }, { status: 400 });
     }
 
-    // Compute total stake = entryFee * number of entries
-    const totalStake = room.entryFee * amount;
+    if (room.midnightContract) {
+      // Midnight room: joining happens client-side (Lace submits the hashed position commitment).
+      // Return the contract address so the client can join on-chain.
+      return NextResponse.json({
+        midnight: true,
+        contractAddress: room.midnightContract,
+        totalStake: room.entryFee * amount,
+      });
+    }
 
-    // Build unsigned transaction for the user to sign
+    // Legacy Solana room path
+    const { PublicKey } = await import("@solana/web3.js");
+    const { getServerSDK } = await import("@/lib/solana/server");
+    const totalStake = room.entryFee * amount;
     const sdk = getServerSDK();
     const tx = await sdk.buildJoinTransaction(
       room.fixtureId,

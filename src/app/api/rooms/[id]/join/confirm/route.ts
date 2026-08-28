@@ -13,12 +13,19 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { wallet, side, amount, txSig } = body;
-    if (!wallet || !side || !amount || !txSig) {
-      return NextResponse.json({ error: "wallet, side, amount, and txSig required" }, { status: 400 });
+    const { wallet, side, amount } = body;
+    if (!wallet || !side || !amount) {
+      return NextResponse.json({ error: "wallet, side, and amount required" }, { status: 400 });
     }
 
-    const result = await addConfirmedParticipant(id, { wallet, side, amount, joinTx: txSig });
+    // Midnight rooms: the position commitment is submitted client-side through Lace.
+    // The confirm step only records the participant.
+    const joinTx = room.midnightContract ? "midnight" : body.txSig;
+    if (!joinTx) {
+      return NextResponse.json({ error: "txSig required" }, { status: 400 });
+    }
+
+    const result = await addConfirmedParticipant(id, { wallet, side, amount, joinTx });
     if (!result) {
       return NextResponse.json({ error: "Room is no longer open" }, { status: 400 });
     }
