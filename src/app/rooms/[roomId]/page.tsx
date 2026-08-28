@@ -123,7 +123,7 @@ export default function RoomDetailPage() {
   const homeCode = teamCode(room?.homeTeam ?? "");
   const awayCode = teamCode(room?.awayTeam ?? "");
 
-  const { score: liveScore, connected: liveConnected } = useLiveScore(
+  const { score: liveScore } = useLiveScore(
     room?.fixtureId ?? 0
   );
   const totalGoals = liveScore
