@@ -1,8 +1,8 @@
 import { findDeployedContract, deployContract, type FoundContract } from "@midnight-ntwrk/midnight-js-contracts";
 import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
 import type { MidnightProviders } from "@midnight-ntwrk/midnight-js-types";
-import { CompiledVeilcastMarketContract } from "./index.js";
-import { createMarketPrivateState, type MarketPrivateState, type PrivatePosition } from "./witnesses.js";
+import { CompiledVeilcastMarketContract } from "./index";
+import { createMarketPrivateState, type MarketPrivateState, type PrivatePosition } from "./witnesses";
 
 export const marketPrivateStateId = "veilcastMarketPrivateState" as const;
 export type MarketCircuitKeys = "submitPosition" | "lockMarket" | "resolveMarket" | "claim";
