@@ -10,38 +10,20 @@ interface LiveScoreState {
   period?: string;
 }
 
-interface TxLINEStreamEvent {
-  FixtureId: number;
-  Seq: number;
-  Action: string;
-  StatusId?: number;
-  GameState?: string;
-  Score?: {
-    Participant1: { Total: { Goals: number } };
-    Participant2: { Total: { Goals: number } };
-  };
-  Clock?: {
-    Running: boolean;
-    Seconds: number;
-  };
-  Ts: number;
+interface ScoreStreamEvent {
+  seq: number;
+  status: string;
+  home_score: number;
+  away_score: number;
 }
 
-function parseTxLINEEvent(e: TxLINEStreamEvent): LiveScoreState | null {
-  if (e.Score?.Participant1?.Total?.Goals == null || e.Score?.Participant2?.Total?.Goals == null) return null;
-  const seconds = e.Clock?.Seconds ?? 0;
-  const minutes = Math.floor(seconds / 60);
-  const statusId = e.StatusId ?? 0;
-  const status = statusId === 4 || statusId === 2 ? "in_progress"
-    : statusId === 3 ? "finished"
-    : e.GameState === "finished" || e.GameState === "closed" ? "finished"
-    : "scheduled";
+function parseScoreEvent(e: ScoreStreamEvent): LiveScoreState | null {
+  if (e.home_score == null || e.away_score == null) return null;
   return {
-    homeScore: e.Score.Participant1.Total.Goals,
-    awayScore: e.Score.Participant2.Total.Goals,
-    seq: e.Seq,
-    status,
-    period: `${minutes}'`,
+    homeScore: e.home_score,
+    awayScore: e.away_score,
+    seq: e.seq,
+    status: e.status,
   };
 }
 
@@ -63,7 +45,7 @@ export function useLiveScore(fixtureId: number, initial?: { homeScore: number; a
         const raw = JSON.parse(event.data);
         const items = Array.isArray(raw) ? raw : [raw];
         for (const item of items) {
-          const parsed = parseTxLINEEvent(item as TxLINEStreamEvent);
+          const parsed = parseScoreEvent(item as ScoreStreamEvent);
           if (parsed) {
             setScore((prev) => (prev && prev.seq >= parsed.seq ? prev : parsed));
           }
