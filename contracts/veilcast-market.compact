@@ -1,0 +1,93 @@
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+
+enum Outcome {
+  UNRESOLVED,
+  YES,
+  NO,
+}
+
+// Public market metadata and aggregate signal.
+export ledger market_id: Bytes<32>;
+export ledger deadline: Uint<64>;
+export ledger locked: Boolean;
+export ledger outcome: Outcome;
+export ledger result_hash: Bytes<32>;
+export ledger yes_count: Uint<64>;
+export ledger no_count: Uint<64>;
+export ledger positions: Set<Bytes<32>>;
+export ledger used_nullifiers: Set<Bytes<32>>;
+export ledger resolver: Bytes<32>;
+
+// The DApp supplies these values locally. They never enter public state.
+witness privatePosition(): [Boolean, Uint<64>, Bytes<32>];
+witness resolverSecret(): Bytes<32>;
+
+constructor(
+  market_id_arg: Bytes<32>,
+  deadline_arg: Uint<64>,
+  resolver_arg: Bytes<32>,
+) {
+  market_id = disclose(market_id_arg);
+  deadline = disclose(deadline_arg);
+  locked = false;
+  resolver = disclose(resolver_arg);
+  outcome = Outcome.UNRESOLVED;
+  result_hash = default<Bytes<32>>;
+  yes_count = 0;
+  no_count = 0;
+}
+
+// A position commitment binds the private side, stake, and random salt.
+export circuit submitPosition(commitment: Bytes<32>): [] {
+  assert(!locked, "Market is locked");
+  assert(!blockTimeGreaterThan(deadline), "Market deadline has passed");
+  assert(!positions.member(commitment), "Position commitment already submitted");
+  const position = privatePosition();
+  const expected = persistentCommit<[Boolean, Uint<64>, Bytes<32>]>(position, position[2]);
+  assert(expected == commitment, "Position commitment does not match private position");
+
+  positions.insert(disclose(commitment));
+  if (position[0]) {
+    yes_count = disclose(yes_count + 1);
+  } else {
+    no_count = disclose(no_count + 1);
+  }
+}
+
+export circuit lockMarket(): [] {
+  assert(!blockTimeGreaterThan(deadline), "Market is already past its deadline");
+  assert(!locked, "Market is already locked");
+  locked = true;
+}
+
+export circuit resolveMarket(
+  outcome_arg: Outcome,
+  result_hash_arg: Bytes<32>,
+): [] {
+  assert(outcome == Outcome.UNRESOLVED, "Market is already resolved");
+  assert(locked, "Market must be locked before resolution");
+  assert(blockTimeGreaterThan(deadline), "Market deadline has not passed");
+  assert(
+    resolver == persistentHash<Bytes<32>>(resolverSecret()),
+    "Resolver authorization failed"
+  );
+
+  outcome = outcome_arg;
+  result_hash = disclose(result_hash_arg);
+}
+
+// A winning position can claim exactly once through a public nullifier set.
+export circuit claim(commitment: Bytes<32>, nullifier: Bytes<32>): [] {
+  assert(outcome != Outcome.UNRESOLVED, "Market is not resolved");
+  assert(positions.member(commitment), "Unknown position commitment");
+  assert(!used_nullifiers.member(nullifier), "Position was already claimed");
+
+  const position = privatePosition();
+  const expected = persistentCommit<[Boolean, Uint<64>, Bytes<32>]>(position, position[2]);
+  assert(expected == commitment, "Position commitment does not match private position");
+  assert(position[0] == (outcome == Outcome.YES), "Position did not win");
+
+  used_nullifiers.insert(disclose(nullifier));
+}
