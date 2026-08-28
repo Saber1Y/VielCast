@@ -42,7 +42,6 @@ constructor(
 // A position commitment binds the private side, stake, and random salt.
 export circuit submitPosition(commitment: Bytes<32>): [] {
   assert(!locked, "Market is locked");
-  assert(!blockTimeGreaterThan(deadline), "Market deadline has passed");
   assert(!positions.member(commitment), "Position commitment already submitted");
   const position = privatePosition();
   const expected = persistentCommit<[Boolean, Uint<64>, Bytes<32>]>(position, position[2]);
@@ -57,8 +56,11 @@ export circuit submitPosition(commitment: Bytes<32>): [] {
 }
 
 export circuit lockMarket(): [] {
-  assert(!blockTimeGreaterThan(deadline), "Market is already past its deadline");
   assert(!locked, "Market is already locked");
+  assert(
+    resolver == persistentHash<Bytes<32>>(resolverSecret()),
+    "Resolver authorization failed"
+  );
   locked = true;
 }
 
@@ -68,7 +70,6 @@ export circuit resolveMarket(
 ): [] {
   assert(outcome == Outcome.UNRESOLVED, "Market is already resolved");
   assert(locked, "Market must be locked before resolution");
-  assert(blockTimeGreaterThan(deadline), "Market deadline has not passed");
   assert(
     resolver == persistentHash<Bytes<32>>(resolverSecret()),
     "Resolver authorization failed"
