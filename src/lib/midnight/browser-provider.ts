@@ -71,7 +71,7 @@ export async function initializeMidnightProviders(
 
   const shieldedAddresses = await wallet.getShieldedAddresses();
   const privateStateProvider = createPrivateStateProvider<"veilcastMarketPrivateState", MarketPrivateState>();
-  const zkConfigProvider = new FetchZkConfigProvider<MarketCircuitKeys>(window.location.origin, fetch.bind(window));
+  const zkConfigProvider = new FetchZkConfigProvider<MarketCircuitKeys>(`${window.location.origin}/midnight`, fetch.bind(window));
 
   return {
     privateStateProvider,
