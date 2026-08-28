@@ -8,3 +8,4 @@ out/
 solana/target/
 solana/admin-keypair.json
 .rooms.json
+contracts/dist/
