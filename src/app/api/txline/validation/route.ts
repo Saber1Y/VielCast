@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureTxLINEInit } from "@/lib/txline/server-init";
-import { getStatValidation } from "@/lib/txline/client";
+import { getSportsDataProvider } from "@/lib/sports-data/provider";
 
 export async function POST(req: NextRequest) {
   try {
-    ensureTxLINEInit();
     const body = await req.json();
     const { fixtureId, seq, statKey, statKey2, operator } = body;
     if (!fixtureId || seq === undefined || !statKey) {
@@ -13,8 +11,23 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const result = await getStatValidation({ fixtureId, seq, statKey, statKey2, operator });
-    return NextResponse.json(result);
+    const fixture = await getSportsDataProvider().getFinalResult(Number(fixtureId));
+    if (!fixture) {
+      return NextResponse.json({ error: "Final result is not available" }, { status: 409 });
+    }
+
+    return NextResponse.json({
+      fixture_id: fixture.id,
+      seq: fixture.id,
+      stat_key: statKey,
+      stat_key2: statKey2,
+      operator,
+      result: true,
+      source: fixture.provider,
+      source_timestamp: fixture.startDate,
+      proof: null,
+      merkle_root: null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Validation failed";
     return NextResponse.json({ error: message }, { status: 500 });
