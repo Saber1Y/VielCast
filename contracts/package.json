@@ -5,7 +5,11 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
-    "@midnight-ntwrk/compact-js": "2.5.1"
+    "@midnight-ntwrk/compact-js": "2.5.1",
+    "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
+    "@midnight-ntwrk/midnight-js-types": "4.1.1",
+    "rxjs": "^7.8.2"
   },
   "scripts": {
     "compile": "compact compile +0.31.1 veilcast-market.compact managed",
