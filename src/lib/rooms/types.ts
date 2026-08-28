@@ -69,6 +69,10 @@ export interface Room {
   initializeTx?: string;
   lockTx?: string;
   settleTx?: string;
+  midnightContract?: string;
+  resolverHash?: string;
+  deployTx?: string;
+  deadline?: number;
   cancelledAt?: string;
   cancelReason?: string;
 }
