@@ -16,7 +16,7 @@ export function TxLineBadge({
         <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
         <path d="M4 6l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      TxLINE {status}
+       Sports data {status}
     </span>
   );
 }
