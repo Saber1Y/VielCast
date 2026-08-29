@@ -10,17 +10,15 @@ const sections = [
     content: (
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
-          ProofPlay Markets is a verifiable prediction market dApp for World Cup matches.
-          Users create rooms, pick a side, stake SOL, and earn payouts when the match
-          ends — all verified through <span className="text-cyan-accent">TxLINE</span>'s
-          real-time sports data oracle with settlement receipts anchored on
-          <span className="text-green-accent"> Solana Devnet</span>.
+          VeilCast is a private prediction market dApp for World Cup matches.
+          Users create rooms, commit a side privately, and claim when the final result is
+          resolved on <span className="text-green-accent">Midnight Preprod</span>.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {[
             { label: "Market Types", value: "Winner Pick + Goal Rush" },
-            { label: "Settlement", value: "TxLINE Merkle Proofs" },
-            { label: "Network", value: "Solana Devnet" },
+            { label: "Settlement", value: "Midnight ZK Resolution" },
+            { label: "Network", value: "Midnight Preprod" },
           ].map((s) => (
             <div key={s.label} className="rounded-lg bg-white/[0.03] px-3 py-2.5">
               <div className="text-[10px] font-mono text-zinc-600">{s.label}</div>
@@ -37,8 +35,8 @@ const sections = [
     content: (
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
-          The system uses Next.js 15 API routes as the backend, with an Anchor program on Solana
-          for on-chain market state. TxLINE provides real-time match data and Merkle-verified results.
+          The system uses Next.js 15 API routes for room records and a Midnight Compact contract
+          for private position commitments, creator-authorized resolution, and winner claims.
         </p>
 
         {/* Flow diagram */}
@@ -47,8 +45,8 @@ const sections = [
             {[
               { label: "User\n(Frontend)", color: "text-green-accent border-green-accent/40" },
               { label: "Next.js\nAPI Routes", color: "text-cyan-accent border-cyan-accent/40" },
-              { label: "Anchor\nProgram", color: "text-amber-400 border-amber-400/40" },
-              { label: "TxLINE\nOracle", color: "text-purple-400 border-purple-400/40" },
+              { label: "Midnight\nContract", color: "text-amber-400 border-amber-400/40" },
+              { label: "Sportmonks\nResult", color: "text-purple-400 border-purple-400/40" },
             ].map((node, i) => (
               <div key={i} className="flex items-center gap-0">
                 <div className={`flex h-20 w-24 items-center justify-center rounded-xl border ${node.color} bg-black/20 px-2 text-center`}>
@@ -76,7 +74,7 @@ const sections = [
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1 w-1 rounded-full bg-green-accent/60" />
-                Privy wallet auth (Solana)
+                Lace wallet connector (Midnight)
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1 w-1 rounded-full bg-green-accent/60" />
@@ -84,7 +82,7 @@ const sections = [
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1 w-1 rounded-full bg-green-accent/60" />
-                Phantom wallet integration
+                Private position commitments
               </li>
             </ul>
           </GlassCard>
@@ -101,7 +99,7 @@ const sections = [
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1 w-1 rounded-full bg-cyan-accent/60" />
-                Anchor + @coral-xyz/anchor SDK
+                Midnight Compact contract + Lace connector
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1 w-1 rounded-full bg-cyan-accent/60" />
@@ -119,37 +117,37 @@ const sections = [
     content: (
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
-          The Anchor program manages prediction markets on-chain. Each fixture has one
-          market PDA. Participants join via a derived participant PDA.
+          The Midnight Compact contract manages prediction markets on-chain. Positions are
+          submitted as private commitments and revealed only when a winner claims.
         </p>
 
         <div className="overflow-x-auto rounded-lg border border-white/5 bg-black/20 p-4">
-          <pre className="text-xs leading-relaxed text-zinc-300"><span className="text-zinc-600">// Program ID</span>
-<span className="text-cyan-accent">D254EggCVsZ7jKtJJ29diEv3P4qqjn5APBAvcRwDNsyE</span>
+          <pre className="text-xs leading-relaxed text-zinc-300"><span className="text-zinc-600">// Contract</span>
+<span className="text-cyan-accent">contracts/veilcast-market.compact</span>
 
-<span className="text-zinc-600">// Market PDA seeds</span>
-<span className="text-purple-400">[b"market", creator, fixtureId_le]</span>
+<span className="text-zinc-600">// Public state</span>
+<span className="text-purple-400">market_id, deadline, locked, outcome, result_hash</span>
 
-<span className="text-zinc-600">// Participant PDA seeds</span>
-<span className="text-purple-400">[b"participant", market, wallet]</span></pre>
+<span className="text-zinc-600">// Private witness state</span>
+<span className="text-purple-400">position(side, stake, salt), resolverSecret</span></pre>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg bg-white/[0.03] p-4">
             <span className="text-xs font-semibold text-amber-400">Instructions</span>
             <ul className="mt-2 flex flex-col gap-1.5 text-xs text-zinc-400">
-              <li><span className="text-zinc-500">initializeMarket</span> — Create a new market PDA</li>
-              <li><span className="text-zinc-500">joinMarket</span> — Join with stake, creates participant PDA</li>
-              <li><span className="text-zinc-500">lockMarket</span> — Lock before kickoff</li>
-              <li><span className="text-zinc-500">settleMarket</span> — Settle with winner + merkle root</li>
-              <li><span className="text-zinc-500">claimPayout</span> — Winner claims SOL from pool</li>
+               <li><span className="text-zinc-500">deploy</span> - Create a private market contract</li>
+               <li><span className="text-zinc-500">submitPosition</span> - Submit a hidden position commitment</li>
+               <li><span className="text-zinc-500">lockMarket</span> - Creator locks the market</li>
+               <li><span className="text-zinc-500">resolveMarket</span> - Creator anchors the final result</li>
+               <li><span className="text-zinc-500">claim</span> - Winner proves the private position with a nullifier</li>
             </ul>
           </div>
           <div className="rounded-lg bg-white/[0.03] p-4">
             <span className="text-xs font-semibold text-amber-400">Accounts</span>
             <ul className="mt-2 flex flex-col gap-1.5 text-xs text-zinc-400">
-              <li><span className="text-zinc-500">Market</span> — Fixture ID, market type, threshold, status, participants, total stake</li>
-              <li><span className="text-zinc-500">Participant</span> — Wallet, side, amount, claimed flag</li>
+               <li><span className="text-zinc-500">Market</span> - Public market metadata and commitment set</li>
+               <li><span className="text-zinc-500">Participant</span> - Server-side display record; side remains private on-chain</li>
             </ul>
           </div>
         </div>
@@ -180,9 +178,8 @@ const sections = [
                 ["/api/rooms/[id]", "GET", "Get room details"],
                 ["/api/rooms/[id]/join", "POST", "Join a room"],
                 ["/api/rooms/[id]/lock", "POST", "Lock room at kickoff"],
-                ["/api/rooms/[id]/settle", "POST", "Settle with TxLINE proof"],
-                ["/api/rooms/[id]/claim", "POST", "Build claim transaction"],
-                ["/api/rooms/[id]/claim/submit", "POST", "Submit payout"],
+                 ["/api/rooms/[id]/settle", "POST", "Fetch result or record Midnight resolution"],
+                 ["/api/rooms/[id]/claim", "POST", "Record a completed Midnight claim"],
                 ["/api/rooms/[id]/receipt", "GET", "Get settlement receipt"],
                 ["/api/txline/fixtures", "GET", "List all fixtures"],
                 ["/api/txline/scores/[id]", "GET", "Get score snapshot"],
@@ -210,8 +207,8 @@ const sections = [
     content: (
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
-          TxLINE is the real-time sports data oracle. All match data — scores, status, stats —
-          flows through TxLINE's API with Merkle-tree based verification for on-chain settlement.
+          Sportmonks provides the final sports result. VeilCast stores a SHA-256 result anchor
+          in the Midnight market when the creator resolves it.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <GlassCard className="p-4" hover={false}>
@@ -266,17 +263,16 @@ const sections = [
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
           Settlement is triggered by the room creator after the match ends. The system
-          fetches the final score from TxLINE, validates it with a Merkle proof, and
-          records the result.
+          fetches the final score from Sportmonks, the creator resolves the Midnight contract,
+          and the server records the receipt after the client reports completion.
         </p>
         <div className="flex flex-col gap-2">
           {[
-            { step: "1", title: "Fetch Score", desc: "GET /api/scores/snapshot/{fixtureId} — retrieves the latest score event with StatusId 5/7/9 (finished)" },
+             { step: "1", title: "Fetch Score", desc: "The server retrieves the final Sportmonks score for the fixture" },
             { step: "2", title: "Determine Winner", desc: "Goal Rush: total goals vs threshold | Winner Pick: HOME/AWAY/DRAW based on scores" },
-            { step: "3", title: "Stat Validation", desc: "POST /api/scores/stat-validation — requests a Merkle proof for the winning stat" },
-            { step: "4", title: "On-Chain Settle", desc: "Calls settleMarket on the Anchor program with the winner side + merkle root" },
-            { step: "5", title: "Generate Receipt", desc: "Stores the full settlement receipt: score, validation, merkle root, payout summary" },
-            { step: "6", title: "Claim Payout", desc: "Winner signs a claim transaction → server sends SOL from the pool to their wallet" },
+             { step: "3", title: "Resolve Result", desc: "The creator calls resolveMarket on Midnight with the outcome and result hash" },
+             { step: "4", title: "Generate Receipt", desc: "The server records the final score, result anchor, and payout summary" },
+             { step: "5", title: "Claim Privately", desc: "The winner calls claim with their private position and a one-time nullifier" },
           ].map((s) => (
             <div key={s.step} className="flex items-start gap-3 rounded-lg bg-white/[0.02] px-4 py-3">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-accent/10 text-[10px] font-mono font-bold text-green-accent">
@@ -309,20 +305,20 @@ npm install --legacy-peer-deps
 
 <span className="text-zinc-600"># 2. Set up environment</span>
 cp .env.example .env
-<span className="text-zinc-600"># Add TXLINE_JWT, TXLINE_API_TOKEN, NEXT_PUBLIC_PRIVY_APP_ID</span>
+<span className="text-zinc-600"># Add SPORTMONKS_API_TOKEN</span>
 
-<span className="text-zinc-600"># 3. Run locally (SSL workaround for expired devnet cert)</span>
-NODE_TLS_REJECT_UNAUTHORIZED=0 npm run dev
+<span className="text-zinc-600"># 3. Run locally</span>
+npm run dev
 
 <span className="text-zinc-600"># 4. Open http://localhost:3000</span></pre>
         </div>
         <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 px-4 py-3">
           <span className="text-xs font-medium text-amber-400">Prerequisites</span>
           <ul className="mt-1.5 flex flex-col gap-1 text-xs text-zinc-500">
-            <li>• Node.js 18+</li>
-            <li>• Phantom wallet (Solana devnet)</li>
-            <li>• Devnet SOL from <a href="https://faucet.solana.com" target="_blank" className="text-cyan-accent hover:underline">faucet.solana.com</a></li>
-            <li>• TxLINE API credentials</li>
+            <li>• Node.js 20+</li>
+            <li>• Lace wallet 4.x on Midnight Preprod</li>
+            <li>• Midnight Preprod test funds</li>
+            <li>• Sportmonks API credentials</li>
           </ul>
         </div>
       </div>
