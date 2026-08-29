@@ -39,30 +39,16 @@ export async function POST(
       return NextResponse.json({ error: "You have already joined this room" }, { status: 400 });
     }
 
-    if (room.midnightContract) {
-      // Midnight room: joining happens client-side (Lace submits the hashed position commitment).
-      // Return the contract address so the client can join on-chain.
-      return NextResponse.json({
-        midnight: true,
-        contractAddress: room.midnightContract,
-        totalStake: room.entryFee * amount,
-      });
+    if (!room.midnightContract) {
+      return NextResponse.json({ error: "This room is not a Midnight room" }, { status: 400 });
     }
 
-    // Legacy Solana room path
-    const { PublicKey } = await import("@solana/web3.js");
-    const { getServerSDK } = await import("@/lib/solana/server");
-    const totalStake = room.entryFee * amount;
-    const sdk = getServerSDK();
-    const tx = await sdk.buildJoinTransaction(
-      room.fixtureId,
-      new PublicKey(wallet),
-      side,
-      totalStake,
-    );
-
+    // Joining happens client-side through Lace. This endpoint only returns
+    // the contract metadata for clients that want to preflight the join.
     return NextResponse.json({
-      tx: Buffer.from(tx.serialize({ verifySignatures: false })).toString("base64"),
+      midnight: true,
+      contractAddress: room.midnightContract,
+      totalStake: room.entryFee * amount,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Invalid request";
