@@ -21,6 +21,8 @@ export async function GET(
     entryFee: room.entryFee,
     homeTeam: room.homeTeam,
     awayTeam: room.awayTeam,
+    homeCrest: room.homeCrest,
+    awayCrest: room.awayCrest,
     participants: room.participants.map((p) => ({
       id: p.id,
       wallet: p.wallet,
