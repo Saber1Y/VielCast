@@ -104,7 +104,7 @@ export default function ReceiptPage() {
         </div>
         <h1 className="text-2xl font-bold">Room Resolved</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Room resolved on Midnight with Sportmonks-verified World Cup data
+          Room resolved on Midnight with Sportmonks-verified league data
         </p>
       </div>
 
