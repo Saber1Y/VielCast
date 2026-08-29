@@ -55,7 +55,6 @@ interface Room {
   resolverHash?: string;
   deployTx?: string;
   deadline?: number;
-  marketPda?: string;
   initializeTx?: string;
   lockTx?: string;
   settleTx?: string;
