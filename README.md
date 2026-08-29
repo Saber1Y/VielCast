@@ -1,6 +1,6 @@
 # VeilCast
 
-**Private prediction rooms for World Cup matches** - commit predictions privately on Midnight, resolve against Sportmonks results, and claim with a zero-knowledge proof.
+**Private prediction rooms for Premier League and La Liga matches** - commit predictions privately on Midnight, resolve against Sportmonks results, and claim with a zero-knowledge proof.
 
 Built for the **TxODDS World Cup Hackathon** on Superteam Earn.
 
