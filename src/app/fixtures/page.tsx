@@ -82,7 +82,7 @@ export default function FixturesPage() {
         <span className="section-header">Live Leagues</span>
         <h1 className="text-2xl font-bold">Fixtures</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Football fixtures powered by Sportmonks
+           Premier League and La Liga fixtures powered by football-data.org
         </p>
       </div>
 
