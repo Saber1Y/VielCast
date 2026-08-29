@@ -208,7 +208,7 @@ export default function RoomDetailPage() {
     setSettling(true);
     setError(null);
     try {
-      // Phase 1: fetch the Sportmonks final result + winner + result anchor.
+      // Phase 1: fetch the football-data.org final result + winner + result anchor.
       const res = await fetch(`/api/rooms/${roomId}/settle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -414,7 +414,7 @@ export default function RoomDetailPage() {
                 <div className="text-center">
                   <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-cyan-accent border-t-transparent" />
                   <p className="text-sm text-zinc-400">Match finished. The creator resolves the market on-chain...</p>
-                  <p className="mt-1 text-xs text-zinc-600">The final Sportmonks score is anchored as a hash at resolve time.</p>
+                  <p className="mt-1 text-xs text-zinc-600">The final football-data.org score is anchored as a hash at resolve time.</p>
                 </div>
               </div>
             </GlassCard>
@@ -678,7 +678,7 @@ export default function RoomDetailPage() {
             <div className="flex flex-col gap-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-zinc-600">Data source</span>
-                <span className="font-medium text-cyan-accent">Sportmonks</span>
+                <span className="font-medium text-cyan-accent">football-data.org</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-zinc-600">Privacy</span>
