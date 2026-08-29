@@ -91,7 +91,7 @@ export class SportmonksProvider implements SportsDataProvider {
 
   private async request(path: string): Promise<SportmonksFixture[]> {
     const response = await fetch(`${this.baseUrl}${path}`, {
-      headers: { Authorization: `Bearer ${requiredToken()}` },
+      headers: { Authorization: requiredToken() },
       cache: "no-store",
     });
 
