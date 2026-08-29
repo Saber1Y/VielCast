@@ -46,7 +46,7 @@ const sections = [
               { label: "User\n(Frontend)", color: "text-green-accent border-green-accent/40" },
               { label: "Next.js\nAPI Routes", color: "text-cyan-accent border-cyan-accent/40" },
               { label: "Midnight\nContract", color: "text-amber-400 border-amber-400/40" },
-              { label: "Sportmonks\nResult", color: "text-purple-400 border-purple-400/40" },
+              { label: "Football Data\nResult", color: "text-purple-400 border-purple-400/40" },
             ].map((node, i) => (
               <div key={i} className="flex items-center gap-0">
                 <div className={`flex h-20 w-24 items-center justify-center rounded-xl border ${node.color} bg-black/20 px-2 text-center`}>
@@ -103,7 +103,7 @@ const sections = [
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1 w-1 rounded-full bg-cyan-accent/60" />
-                TxLINE REST + SSE client
+                football-data.org REST client
               </li>
             </ul>
           </GlassCard>
@@ -207,7 +207,7 @@ const sections = [
     content: (
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
-          Sportmonks provides the final sports result. VeilCast stores a SHA-256 result anchor
+          football-data.org provides the final sports result. VeilCast stores a SHA-256 result anchor
           in the Midnight market when the creator resolves it.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -263,12 +263,12 @@ const sections = [
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
           Settlement is triggered by the room creator after the match ends. The system
-          fetches the final score from Sportmonks, the creator resolves the Midnight contract,
+          fetches the final score from football-data.org, the creator resolves the Midnight contract,
           and the server records the receipt after the client reports completion.
         </p>
         <div className="flex flex-col gap-2">
           {[
-             { step: "1", title: "Fetch Score", desc: "The server retrieves the final Sportmonks score for the fixture" },
+             { step: "1", title: "Fetch Score", desc: "The server retrieves the final football-data.org score for the fixture" },
             { step: "2", title: "Determine Winner", desc: "Goal Rush: total goals vs threshold | Winner Pick: HOME/AWAY/DRAW based on scores" },
              { step: "3", title: "Resolve Result", desc: "The creator calls resolveMarket on Midnight with the outcome and result hash" },
              { step: "4", title: "Generate Receipt", desc: "The server records the final score, result anchor, and payout summary" },
@@ -318,7 +318,7 @@ npm run dev
             <li>• Node.js 20+</li>
             <li>• Lace wallet 4.x on Midnight Preprod</li>
             <li>• Midnight Preprod test funds</li>
-            <li>• Sportmonks API credentials</li>
+            <li>• football-data.org API token</li>
           </ul>
         </div>
       </div>
