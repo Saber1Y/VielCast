@@ -3,7 +3,6 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { teamCode } from "@/lib/teams";
 import { GlassCard } from "@/components/ui/GlassCard";
 import {
   useMidnightMarket,
@@ -13,6 +12,8 @@ interface Fixture {
   id: number;
   homeTeam: string;
   awayTeam: string;
+  homeCrest?: string;
+  awayCrest?: string;
   startDate: string;
   competition: string;
 }
@@ -68,8 +69,6 @@ function CreateRoomForm() {
   }, []);
 
   const selected = fixtures.find((f) => f.id === Number(selectedFixture));
-  const homeCode = teamCode(selected?.homeTeam ?? "");
-  const awayCode = teamCode(selected?.awayTeam ?? "");
 
   const kickoffMs = selected ? new Date(selected.startDate).getTime() : 0;
   const deadline = kickoffMs > 0 ? Math.floor(kickoffMs / 1000) + 7200 : 0;
@@ -129,6 +128,8 @@ function CreateRoomForm() {
           fixtureId: selected.id,
           homeTeam: selected.homeTeam,
           awayTeam: selected.awayTeam,
+          homeCrest: selected.homeCrest,
+          awayCrest: selected.awayCrest,
           marketType: "TOTAL_GOALS_OVER_UNDER",
           threshold: Number(threshold),
           entryFee: Math.round(Number(entryFee) * 1e9),
@@ -370,11 +371,11 @@ function CreateRoomForm() {
             {selected && (
               <div className="glass mt-3 flex items-center gap-3 rounded-lg px-4 py-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold">
-                  {homeCode ? (
+                  {selected.homeCrest ? (
                     <img
-                      src={`https://flagcdn.com/${homeCode.toLowerCase()}.svg`}
+                      src={selected.homeCrest}
                       alt=""
-                      className="h-5 w-5 rounded-full object-cover"
+                      className="h-5 w-5 object-contain"
                     />
                   ) : (
                     selected.homeTeam.charAt(0)
@@ -386,11 +387,11 @@ function CreateRoomForm() {
                   <span className="font-medium text-zinc-200">{selected.awayTeam}</span>
                 </div>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold">
-                  {awayCode ? (
+                  {selected.awayCrest ? (
                     <img
-                      src={`https://flagcdn.com/${awayCode.toLowerCase()}.svg`}
+                      src={selected.awayCrest}
                       alt=""
-                      className="h-5 w-5 rounded-full object-cover"
+                      className="h-5 w-5 object-contain"
                     />
                   ) : (
                     selected.awayTeam.charAt(0)
