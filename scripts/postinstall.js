@@ -4,7 +4,6 @@ const path = require("path");
 const stubs = {
   "@stripe/crypto": { main: "index.js", content: "export {};" },
   "@farcaster/mini-app-solana": { main: "index.js", content: "export {};" },
-  "@solana-program/memo": { main: "index.js", content: "export function getAddMemoInstruction() { return { programAddress: '', data: new Uint8Array([]) }; }" },
 };
 
 for (const [pkg, stub] of Object.entries(stubs)) {
