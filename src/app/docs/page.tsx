@@ -10,7 +10,7 @@ const sections = [
     content: (
       <div className="flex flex-col gap-4">
         <p className="text-sm leading-relaxed text-zinc-400">
-          VeilCast is a private prediction market dApp for World Cup matches.
+          VeilCast is a private prediction market dApp for Premier League and La Liga matches.
           Users create rooms, commit a side privately, and claim when the final result is
           resolved on <span className="text-green-accent">Midnight Preprod</span>.
         </p>
