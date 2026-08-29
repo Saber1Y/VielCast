@@ -104,7 +104,7 @@ export default function ReceiptPage() {
         </div>
         <h1 className="text-2xl font-bold">Room Resolved</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Room resolved on Midnight with Sportmonks-verified league data
+          Room resolved on Midnight with football-data.org league data
         </p>
       </div>
 
@@ -174,7 +174,7 @@ export default function ReceiptPage() {
         <span className="section-header mb-4 block">Verification Trail</span>
         <div className="flex items-center gap-3">
           {[
-            { label: "Sportmonks Score", status: "completed", step: 1 },
+            { label: "Football Data Score", status: "completed", step: 1 },
             { label: "Winner Rule", status: "completed", step: 2 },
             { label: "Midnight Resolution", status: receipt.settlementTx ? "completed" : "active", step: 3 },
           ].map((v, i) => (
@@ -378,7 +378,7 @@ export default function ReceiptPage() {
             <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M4 6l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Verified by Sportmonks
+          Verified by football-data.org
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
           <svg className="h-3 w-3 text-emerald-400" viewBox="0 0 12 12" fill="currentColor">
