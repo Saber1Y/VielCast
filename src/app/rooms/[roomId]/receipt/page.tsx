@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { teamCode } from "@/lib/teams";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TxLineBadge } from "@/components/ui/TxLineBadge";
 import { MidnightBadge } from "@/components/ui/MidnightBadge";
@@ -35,6 +34,8 @@ interface Receipt {
   payoutSummary: PayoutSummary[];
   homeTeam?: string;
   awayTeam?: string;
+  homeCrest?: string;
+  awayCrest?: string;
   participants?: Participant[];
   status?: string;
 }
@@ -79,8 +80,6 @@ export default function ReceiptPage() {
     );
   }
 
-  const homeCode = teamCode(receipt.homeTeam ?? "");
-  const awayCode = teamCode(receipt.awayTeam ?? "");
   const isOverUnder = receipt.marketType === "TOTAL_GOALS_OVER_UNDER";
 
   return (
@@ -114,8 +113,8 @@ export default function ReceiptPage() {
           <div className="flex items-center justify-between">
             <div className="flex flex-col items-center gap-2">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5">
-                {homeCode ? (
-                  <img src={`https://flagcdn.com/${homeCode.toLowerCase()}.svg`} alt="" className="h-8 w-8 rounded-full object-cover" />
+                {receipt.homeCrest ? (
+                  <img src={receipt.homeCrest} alt={receipt.homeTeam ?? "Home"} className="h-8 w-8 object-contain" />
                 ) : (
                   <span className="text-lg font-bold">H</span>
                 )}
@@ -136,8 +135,8 @@ export default function ReceiptPage() {
 
             <div className="flex flex-col items-center gap-2">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5">
-                {awayCode ? (
-                  <img src={`https://flagcdn.com/${awayCode.toLowerCase()}.svg`} alt="" className="h-8 w-8 rounded-full object-cover" />
+                {receipt.awayCrest ? (
+                  <img src={receipt.awayCrest} alt={receipt.awayTeam ?? "Away"} className="h-8 w-8 object-contain" />
                 ) : (
                   <span className="text-lg font-bold">A</span>
                 )}
