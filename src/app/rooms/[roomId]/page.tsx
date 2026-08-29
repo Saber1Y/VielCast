@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { teamCode } from "@/lib/teams";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { TxLineBadge } from "@/components/ui/TxLineBadge";
@@ -41,6 +40,8 @@ interface Room {
   fixtureId: number;
   homeTeam: string;
   awayTeam: string;
+  homeCrest?: string;
+  awayCrest?: string;
   marketType: string;
   threshold: number;
   entryFee: number;
@@ -119,8 +120,6 @@ export default function RoomDetailPage() {
   const iWon = myParticipant && myParticipant.side === room?.winnerSide;
   const alreadyClaimed = myParticipant?.claimed;
 
-  const homeCode = teamCode(room?.homeTeam ?? "");
-  const awayCode = teamCode(room?.awayTeam ?? "");
 
   const { score: liveScore } = useLiveScore(
     room?.fixtureId ?? 0
@@ -353,8 +352,8 @@ export default function RoomDetailPage() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5">
-                {homeCode ? (
-                  <img src={`https://flagcdn.com/${homeCode.toLowerCase()}.svg`} alt="" className="h-6 w-6 rounded-full object-cover" />
+                {room.homeCrest ? (
+                  <img src={room.homeCrest} alt={room.homeTeam} className="h-6 w-6 object-contain" />
                 ) : room.homeTeam.charAt(0)}
               </div>
               <span className="font-semibold text-white">{room.homeTeam}</span>
@@ -369,8 +368,8 @@ export default function RoomDetailPage() {
               )}
               <span className="font-semibold text-white">{room.awayTeam}</span>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5">
-                {awayCode ? (
-                  <img src={`https://flagcdn.com/${awayCode.toLowerCase()}.svg`} alt="" className="h-6 w-6 rounded-full object-cover" />
+                {room.awayCrest ? (
+                  <img src={room.awayCrest} alt={room.awayTeam} className="h-6 w-6 object-contain" />
                 ) : room.awayTeam.charAt(0)}
               </div>
             </div>
