@@ -6,6 +6,8 @@ export interface SportsFixture {
   leagueName: string;
   homeTeam: string;
   awayTeam: string;
+  homeCrest?: string;
+  awayCrest?: string;
   startDate: string;
   status: MatchStatus;
   homeScore?: number;
