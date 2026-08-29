@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Sora } from "next/font/google";
-import { PrivyProvider } from "@/components/PrivyProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import "./globals.css";
 
@@ -21,9 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={sora.variable}>
       <body className="antialiased" style={{ fontFamily: "var(--font-sora), sans-serif" }}>
-        <PrivyProvider>
-          <AppShell>{children}</AppShell>
-        </PrivyProvider>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
