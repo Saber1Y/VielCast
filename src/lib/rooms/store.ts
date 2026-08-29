@@ -119,6 +119,8 @@ export async function createRoom(data: {
   fixtureId: number;
   homeTeam: string;
   awayTeam: string;
+  homeCrest?: string;
+  awayCrest?: string;
   marketType: string;
   threshold: number;
   entryFee: number;
@@ -137,6 +139,8 @@ export async function createRoom(data: {
     fixtureId: data.fixtureId,
     homeTeam: data.homeTeam,
     awayTeam: data.awayTeam,
+    homeCrest: data.homeCrest,
+    awayCrest: data.awayCrest,
     marketType: data.marketType as Room["marketType"],
     threshold: data.threshold,
     entryFee: data.entryFee,
