@@ -55,6 +55,8 @@ export interface Room {
   fixtureId: number;
   homeTeam: string;
   awayTeam: string;
+  homeCrest?: string;
+  awayCrest?: string;
   marketType: MarketType;
   threshold: number;
   entryFee: number; // lamports per entry
