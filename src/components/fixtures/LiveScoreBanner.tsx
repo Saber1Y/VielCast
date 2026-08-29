@@ -1,6 +1,5 @@
 "use client";
 
-import { teamCode } from "@/lib/teams";
 import { useLiveScore } from "@/lib/txline/useLiveScore";
 import { TxLineBadge } from "@/components/ui/TxLineBadge";
 
@@ -8,6 +7,8 @@ export function LiveScoreBanner({
   fixtureId,
   homeTeam,
   awayTeam,
+  homeCrest,
+  awayCrest,
   initialHomeScore,
   initialAwayScore,
   isLive,
@@ -15,6 +16,8 @@ export function LiveScoreBanner({
   fixtureId: number;
   homeTeam: string;
   awayTeam: string;
+  homeCrest?: string;
+  awayCrest?: string;
   initialHomeScore?: number;
   initialAwayScore?: number;
   isLive: boolean;
@@ -29,19 +32,17 @@ export function LiveScoreBanner({
     homeScore: initialHomeScore ?? 0,
     awayScore: initialAwayScore ?? 0,
   });
-  const homeCode = teamCode(homeTeam);
-  const awayCode = teamCode(awayTeam);
   const hasScore = homeScore != null && awayScore != null;
 
   return (
     <div className="flex items-center justify-between py-4">
       <div className="flex flex-1 flex-col items-center gap-2">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
-          {homeCode ? (
+          {homeCrest ? (
             <img
-              src={`https://flagcdn.com/${homeCode.toLowerCase()}.svg`}
+              src={homeCrest}
               alt={homeTeam}
-              className="h-10 w-10 rounded-full object-cover"
+              className="h-10 w-10 object-contain"
             />
           ) : (
             <span className="text-xl font-bold text-zinc-400">{homeTeam.charAt(0)}</span>
@@ -82,11 +83,11 @@ export function LiveScoreBanner({
 
       <div className="flex flex-1 flex-col items-center gap-2">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
-          {awayCode ? (
+          {awayCrest ? (
             <img
-              src={`https://flagcdn.com/${awayCode.toLowerCase()}.svg`}
+              src={awayCrest}
               alt={awayTeam}
-              className="h-10 w-10 rounded-full object-cover"
+              className="h-10 w-10 object-contain"
             />
           ) : (
             <span className="text-xl font-bold text-zinc-400">{awayTeam.charAt(0)}</span>
