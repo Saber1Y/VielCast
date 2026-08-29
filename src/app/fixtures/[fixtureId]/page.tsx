@@ -197,7 +197,7 @@ export default function FixtureDetailPage() {
 
           {/* Data panel */}
           <GlassCard className="p-4" hover={false}>
-            <span className="section-header mb-3 block">TxLINE Data</span>
+             <span className="section-header mb-3 block">Football Data</span>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <span className="text-zinc-600">Fixture ID</span>
@@ -242,7 +242,7 @@ export default function FixtureDetailPage() {
                     </h3>
                     <p className="mt-1 text-xs text-zinc-500">{tpl.prompt}</p>
                     <p className="mt-1 text-[10px] text-zinc-600">
-                      TxLINE: {tpl.statKeys}
+                       Result rule: {tpl.statKeys}
                     </p>
                   </div>
                   <svg
