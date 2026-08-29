@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
-import { teamCode } from "@/lib/teams";
 
 type Fixture = {
   id: number;
   homeTeam: string;
   awayTeam: string;
+  homeCrest?: string;
+  awayCrest?: string;
   startDate: string;
   competition: string;
   status: string;
@@ -56,9 +57,6 @@ export function FixtureCard({
   fixture: Fixture;
   variant?: "hero" | "default";
 }) {
-  const homeCode = teamCode(fixture.homeTeam);
-  const awayCode = teamCode(fixture.awayTeam);
-
   const isLive = fixture.status === "live";
   const isFinished = fixture.status === "finished";
   const isUpcoming = fixture.status === "upcoming" || fixture.status === "scheduled";
@@ -83,11 +81,11 @@ export function FixtureCard({
           <div className="mb-4 flex items-center justify-between">
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-xl font-bold">
-                {homeCode ? (
+                {fixture.homeCrest ? (
                   <img
-                    src={`https://flagcdn.com/${homeCode.toLowerCase()}.svg`}
+                    src={fixture.homeCrest}
                     alt={fixture.homeTeam}
-                    className="h-8 w-8 rounded-full object-cover"
+                    className="h-9 w-9 object-contain"
                   />
                 ) : (
                   fixture.homeTeam.charAt(0)
@@ -113,11 +111,11 @@ export function FixtureCard({
 
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5 text-xl font-bold">
-                {awayCode ? (
+                {fixture.awayCrest ? (
                   <img
-                    src={`https://flagcdn.com/${awayCode.toLowerCase()}.svg`}
+                    src={fixture.awayCrest}
                     alt={fixture.awayTeam}
-                    className="h-8 w-8 rounded-full object-cover"
+                    className="h-9 w-9 object-contain"
                   />
                 ) : (
                   fixture.awayTeam.charAt(0)
@@ -145,11 +143,11 @@ export function FixtureCard({
       <div className="glass-card group flex items-center gap-4 p-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold shrink-0">
-            {homeCode ? (
+            {fixture.homeCrest ? (
               <img
-                src={`https://flagcdn.com/${homeCode.toLowerCase()}.svg`}
+                src={fixture.homeCrest}
                 alt={fixture.homeTeam}
-                className="h-5 w-5 rounded-full object-cover"
+                className="h-5 w-5 object-contain"
               />
             ) : (
               fixture.homeTeam.charAt(0)
@@ -176,11 +174,11 @@ export function FixtureCard({
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
           <span className="truncate text-sm text-zinc-200">{fixture.awayTeam}</span>
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold shrink-0">
-            {awayCode ? (
+            {fixture.awayCrest ? (
               <img
-                src={`https://flagcdn.com/${awayCode.toLowerCase()}.svg`}
+                src={fixture.awayCrest}
                 alt={fixture.awayTeam}
-                className="h-5 w-5 rounded-full object-cover"
+                className="h-5 w-5 object-contain"
               />
             ) : (
               fixture.awayTeam.charAt(0)
