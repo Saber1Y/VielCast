@@ -120,7 +120,7 @@ export default function FixtureDetailPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
-              {fixture?.competition ?? "World Cup"}
+              {fixture?.competition ?? "Premier League or La Liga"}
             </span>
             {fixture && (
               <span className="text-[10px] text-zinc-600">
