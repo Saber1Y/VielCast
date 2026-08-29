@@ -33,6 +33,12 @@ interface SportmonksResponse {
   data?: SportmonksFixture | SportmonksFixture[];
 }
 
+const SUPPORTED_LEAGUES = new Set(["premier league", "la liga"]);
+
+function isSupportedLeague(fixture: SportsFixture): boolean {
+  return SUPPORTED_LEAGUES.has(fixture.leagueName.trim().toLowerCase());
+}
+
 function requiredToken(): string {
   const token = process.env.SPORTMONKS_API_TOKEN;
   if (!token) throw new Error("SPORTMONKS_API_TOKEN must be set");
@@ -111,18 +117,21 @@ export class SportmonksProvider implements SportsDataProvider {
     const fixtures = await this.request(`/fixtures/between/${start}/${end}?include=participants;scores;state;league`);
     return fixtures
       .map(normalize)
+      .filter(isSupportedLeague)
       .filter((fixture) => leagueId === undefined || fixture.leagueId === leagueId);
   }
 
   async getFixtureById(fixtureId: number): Promise<SportsFixture | null> {
     const fixtures = await this.request(`/fixtures/${fixtureId}?include=participants;scores;state;league`);
-    return fixtures[0] ? normalize(fixtures[0]) : null;
+    const fixture = fixtures[0] ? normalize(fixtures[0]) : null;
+    return fixture && isSupportedLeague(fixture) ? fixture : null;
   }
 
   async getLiveMatches(leagueId?: number): Promise<SportsFixture[]> {
     const fixtures = await this.request("/livescores?include=participants;scores;state;league");
     return fixtures
       .map(normalize)
+      .filter(isSupportedLeague)
       .filter((fixture) => leagueId === undefined || fixture.leagueId === leagueId);
   }
 
