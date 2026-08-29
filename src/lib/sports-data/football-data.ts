@@ -15,8 +15,8 @@ interface FootballDataMatch {
   utcDate: string;
   status: FootballDataStatus;
   competition?: { id?: number; name?: string; code?: string };
-  homeTeam?: { name?: string };
-  awayTeam?: { name?: string };
+  homeTeam?: { name?: string; crest?: string };
+  awayTeam?: { name?: string; crest?: string };
   score?: {
     fullTime?: { home?: number | null; away?: number | null };
   };
@@ -57,6 +57,8 @@ function normalize(match: FootballDataMatch): SportsFixture {
     leagueName: COMPETITION_NAMES[code] ?? match.competition?.name ?? "Unknown league",
     homeTeam: match.homeTeam?.name ?? "Home team",
     awayTeam: match.awayTeam?.name ?? "Away team",
+    homeCrest: match.homeTeam?.crest,
+    awayCrest: match.awayTeam?.crest,
     startDate: new Date(match.utcDate).toISOString(),
     status: statusOf(match.status),
     homeScore: score?.home ?? undefined,
