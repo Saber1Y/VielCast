@@ -17,6 +17,8 @@ interface FixtureInfo {
   startDate: string;
   status: string;
   competition?: string;
+  homeCrest?: string;
+  awayCrest?: string;
 }
 
 const ROOM_TEMPLATES = [
@@ -151,6 +153,8 @@ export default function FixtureDetailPage() {
           fixtureId={Number(fixtureId)}
           homeTeam={fixture?.homeTeam ?? ""}
           awayTeam={fixture?.awayTeam ?? ""}
+          homeCrest={fixture?.homeCrest}
+          awayCrest={fixture?.awayCrest}
           initialHomeScore={liveScore?.homeScore}
           initialAwayScore={liveScore?.awayScore}
           isLive={isLive}
