@@ -1,6 +1,6 @@
-# ProofPlay World Cup
+# VeilCast
 
-**Verifiable prediction rooms for World Cup matches** — stake on match outcomes, settle automatically with TxLINE data streams, and claim payouts on Solana.
+**Private prediction rooms for World Cup matches** - commit predictions privately on Midnight, resolve against Sportmonks results, and claim with a zero-knowledge proof.
 
 Built for the **TxODDS World Cup Hackathon** on Superteam Earn.
 
@@ -8,20 +8,19 @@ Built for the **TxODDS World Cup Hackathon** on Superteam Earn.
 
 Sports betting and prediction markets face a trust problem: how do participants know the outcome is correct, that their stake is safe, and that the settlement is fair? Traditional platforms are opaque black boxes.
 
-**ProofPlay solves this** by combining:
-1. **TxLINE** — real-time, verifiable sports data via SSE streams
-2. **Solana** — on-chain market accounts, participant PDAs, and programmatic settlement with no intermediaries
-3. **Merklized proofs** — every settlement is anchored on-chain with a verifiable receipt
+**VeilCast solves this** by combining:
+1. **Sportmonks** - final football results used for deterministic resolution
+2. **Midnight** - private position commitments and creator-authorized resolution
+3. **Zero-knowledge proofs** - winners reveal only the position needed to claim
 
 ## How It Works
 
 ```
-User creates a room → Users join (sign tx, stake SOL) → Lock at kickoff
-→ Match ends → Anyone can settle → Solana program determines winner
-→ Winner claims 2× payout from on-chain vault
+Creator deploys a room → Users submit private commitments → Creator locks at kickoff
+→ Match ends → Creator resolves on Midnight → Winner proves their position to claim
 ```
 
-**One fixture = one room.** Each market has a unique PDA derived from the admin + fixture ID. Duplicate creation returns the existing on-chain market.
+**One fixture = one room.** Each market is a Midnight contract with a unique market ID. Duplicate creation is rejected while an active room exists.
 
 ### Room Lifecycle
 
@@ -35,14 +34,14 @@ User creates a room → Users join (sign tx, stake SOL) → Lock at kickoff
 
 ## Features
 
-- **Browse 81 World Cup fixtures** from TxLINE with live status (upcoming / live / finished)
-- **Create prediction rooms** — Over/Under Total Goals or Match Winner markets via a 4-step wizard
-- **Join rooms** — stake on a side with your Solana wallet (Phantom, Privy, any WalletConnect wallet)
-- **Live score banners** — real-time SSE stream from TxLINE during matches
-- **Permissionless settlement** — anyone can trigger settlement after a match ends
-- **Verifiable settlement receipts** — final score, winner side, participant payouts, on-chain tx links
+- **Browse World Cup fixtures** with live status (upcoming / live / finished)
+- **Create private prediction rooms** - deploy Over/Under markets through a 4-step wizard
+- **Join rooms** - submit a hidden position commitment with a Lace wallet
+- **Live score banners** - real-time score stream during matches
+- **Creator-authorized settlement** - the creator resolves after the final result is available
+- **Verifiable settlement receipts** - final score, winner side, result anchor, and claim records
 - **Activity log** — every event (join, lock, settle, claim, cancel) is recorded
-- **Wallet disconnect** — switch wallets freely with dropdown disconnect
+- **Lace wallet connection** - Midnight Preprod wallet identity and proof signing
 - **No external backend** — everything runs in Next.js API routes with file-based persistence
 
 ## Tech Stack
@@ -50,26 +49,24 @@ User creates a room → Users join (sign tx, stake SOL) → Lock at kickoff
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS v4 |
-| Smart Contracts | Solana Anchor v0.32 (devnet) |
-| Oracle | TxLINE Sports Data (SSE streams, score snapshots) |
-| Wallet | Privy Auth (Phantom, embedded wallet, WalletConnect) |
+| Smart Contracts | Midnight Compact (Preprod) |
+| Oracle | Sportmonks Sports Data |
+| Wallet | Lace Midnight connector 4.x |
 | Persistence | File-based via `.rooms.json` |
-| Settlement | On-chain via Anchor program (2× payout to winners) |
+| Settlement | Midnight resolver commitment and private claim proof |
 
 ### On-Chain Architecture
 
-**Program ID:** `D254EggCVsZ7jKtJJ29diEv3P4qqjn5APBAvcRwDNsyE` (devnet)
+The Compact contract is defined in `contracts/veilcast-market.compact` and deployed to Midnight Preprod from the browser through Lace.
 
 ```
-Instructions:
-  initializeMarket → Creates market PDA (admin signs)
-  joinMarket       → Creates participant PDA, transfers stake (user signs)
-  lockMarket       → Locks market at kickoff (admin signs)
-  settleMarket     → Sets winner side + merkle root (admin signs)
-  claimPayout      → Transfers 2× stake from vault to winner (user signs)
+Circuits:
+  deploy           → Creates a market contract
+  submitPosition   → Adds a private position commitment
+  lockMarket       → Creator locks the market
+  resolveMarket    → Creator anchors the final outcome
+  claim            → Winner reveals a valid position and one-time nullifier
 ```
-
-**Admin Wallet:** `JE4HHzibqoAmMDsgkmE3mzAKedNB1fwWQUwPmftVnBjj` (devnet) — funds market PDA rent. Users need devnet SOL for participant rent (~0.002 SOL per join).
 
 ## Quick Start
 
@@ -79,18 +76,16 @@ npm install
 
 # Set up env
 cp .env.example .env
-# Fill in TXLINE_JWT and TXLINE_API_TOKEN (see docs/)
+# Fill in SPORTMONKS_API_TOKEN (see .env.example)
 
 # Run
 npm run dev
 # → http://localhost:3000
 ```
 
-## Getting Devnet SOL
+## Getting Midnight Preprod Funds
 
-Participants need devnet SOL to join rooms (covers PDA rent + tx fees + stake).
-
-Get free devnet SOL from the [Solana faucet](https://faucet.solana.com/). For the admin wallet, use the same faucet and send to `JE4HHzibqoAmMDsgkmE3mzAKedNB1fwWQUwPmftVnBjj`.
+Use the official Midnight Preprod faucet to fund each Lace test wallet before deploying or joining.
 
 ## Subscribe to TxLINE
 
@@ -98,7 +93,7 @@ Get free devnet SOL from the [Solana faucet](https://faucet.solana.com/). For th
 npx tsx scripts/subscribe-txline.ts
 ```
 
-Generates a Solana keypair, sends a 0.01 SOL tx to activate devnet access, and prints your JWT + API token.
+This legacy script activates the historical TxLINE integration and is not required for the Midnight room flow.
 
 ## Project Structure
 
