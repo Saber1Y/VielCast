@@ -75,7 +75,7 @@ export function FixtureCard({
             </span>
             {isLive && (
               <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-600">
-                Sportmonks
+                football-data.org
               </span>
             )}
           </div>
