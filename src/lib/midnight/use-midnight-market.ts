@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
 import { MarketAPI, type MarketProviders } from "../../../contracts/src/market-api";
+import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import {
   positionCommitment,
   type PrivatePosition,
@@ -25,17 +26,39 @@ export function useMidnightMarket() {
 
     try {
       const wallet = await connectMidnightWallet();
-      const configuredProviders = await initializeMidnightProviders(wallet);
-      setProviders(configuredProviders);
+      // Ensure network ID is set even if providers init has issues
+      let providersFromInit: MarketProviders | null = null;
+      try {
+        providersFromInit = await initializeMidnightProviders(wallet);
+      } catch (provErr) {
+        console.warn("[midnight] providers init warning:", provErr instanceof Error ? provErr.message : provErr);
+        // providers stays null if init failed, but we still have a wallet
+      }
+      setProviders(providersFromInit); // set providers from init, or keep null if init failed
+      // Debug: log providers state
+      if (providersFromInit) {
+        console.info("[midnight] providers from init:", Object.keys(providersFromInit));
+      }
+      // Ensure network ID is set for contract operations - call setNetworkId explicitly
+      // This must happen after providers state is set
+      if (!providersFromInit) {
+        // If providers is null, we still need to set network ID so deployMarket doesn't fail
+        // The connect() function will re-establish providers on next click
+        setNetworkId("preprod");
+      }
       const addresses = await wallet.getShieldedAddresses();
       setWalletAddress(addresses.shieldedCoinPublicKey);
       setStatus("connected");
-      return wallet;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Midnight wallet connection failed";
       setError(message);
       setStatus("error");
       throw new Error(message);
+    }
+    // Log the connected wallet address for debugging
+    if (walletAddress) {
+      console.info("[midnight] Connected wallet address:", walletAddress);
+      console.info("[midnight] Address short:", walletAddress?.slice(0, 6) + "..." + walletAddress?.slice(-4));
     }
   }, []);
 

@@ -35,7 +35,7 @@ function findWallet(): InitialAPI | undefined {
       typeof wallet === "object" &&
       "apiVersion" in wallet &&
       typeof wallet.apiVersion === "string" &&
-      semver.satisfies(wallet.apiVersion, "4.x"),
+      wallet.apiVersion === "4.0.1",
   );
 }
 
@@ -46,12 +46,34 @@ export async function connectMidnightWallet(networkId: NetworkId = DEFAULT_NETWO
       map(() => findWallet()),
       filter((wallet): wallet is InitialAPI => !!wallet),
       take(1),
-      timeout({ first: 3_000, with: () => throwError(() => new Error("Could not find a compatible Lace wallet.")) }),
-      concatMap((wallet) => wallet.connect(networkId)),
-      timeout({ first: 5_000, with: () => throwError(() => new Error("Lace wallet failed to respond.")) }),
-      catchError((error) =>
-        throwError(() => (error instanceof Error ? error : new Error("Midnight wallet authorization failed."))),
-      ),
+      timeout({ first: 5_000, with: () => throwError(() => new Error("Could not find a compatible Midnight wallet. Is the wallet extension installed and unlocked?")) }),
+      concatMap((wallet) => {
+        console.info("[midnight] Midnight wallet found, initiating connect...", { networkId, apiVersion: wallet.apiVersion });
+        return wallet.connect(networkId);
+      }),
+      timeout({ first: 10_000, with: () => throwError(() => new Error("Midnight wallet connect timed out. The wallet extension may need more time to initialize, or ensure it's set to Midnight Preprod network (not mainnet).")) }),
+      catchError((error) => {
+        if (error instanceof Error) {
+          const msg = error.message;
+          if (msg.includes("Could not find")) {
+            return throwError(() => new Error("Could not find a compatible Midnight wallet. Is the wallet extension installed and unlocked?"));
+          }
+          if (msg.includes("connect timed out")) {
+            return throwError(() => new Error("Midnight wallet connect timed out. Make sure you approved the connection in the wallet extension."));
+          }
+        }
+        return throwError(() => new Error("Midnight wallet authorization failed."));
+      }),
+      // After successful connection, ensure network ID is set
+      map((wallet) => {
+        try {
+          setNetworkId(networkId);
+          console.info("[midnight] Network ID set to", networkId);
+        } catch (e) {
+          console.warn("[midnight] Could not set network ID explicitly, relying on wallet connection", e);
+        }
+        return wallet;
+      }),
     ),
   );
 
@@ -64,16 +86,20 @@ export async function initializeMidnightProviders(
 ): Promise<MarketProviders> {
   setNetworkId(networkId);
   const configuration = await wallet.getConfiguration();
-  if (!configuration.proverServerUri) throw new Error("Lace did not provide a Midnight proof server URL.");
+
+  if (!configuration.proverServerUri) {
+    throw new Error("Midnight wallet did not provide a prover server URL. Please ensure your wallet is configured for Midnight Preprod and has completed any required onboarding steps.");
+  }
+
   if (!configuration.indexerUri || !configuration.indexerWsUri) {
-    throw new Error("Lace did not provide Midnight indexer URLs.");
+    throw new Error("Midnight wallet did not provide sufficient indexer URLs. Please ensure your wallet is configured for Midnight Preprod and has completed any required onboarding steps.");
   }
 
   const shieldedAddresses = await wallet.getShieldedAddresses();
   const privateStateProvider = createPrivateStateProvider<"veilcastMarketPrivateState", MarketPrivateState>();
   const zkConfigProvider = new FetchZkConfigProvider<MarketCircuitKeys>(`${window.location.origin}/midnight`, fetch.bind(window));
 
-  return {
+return {
     privateStateProvider,
     zkConfigProvider,
     proofProvider: httpClientProofProvider(configuration.proverServerUri, zkConfigProvider),

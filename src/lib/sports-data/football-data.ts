@@ -70,6 +70,9 @@ function normalize(match: FootballDataMatch): SportsFixture {
 export class FootballDataProvider implements SportsDataProvider {
   private readonly baseUrl = "https://api.football-data.org/v4";
 
+  private readonly cache = new Map<string, { data: SportsFixture[]; timestamp: number }>();
+  private static CACHE_TTL = 60_000; // 1 minute cache
+
   private async request(path: string): Promise<FootballDataMatch[]> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       headers: { "X-Auth-Token": requiredToken() },
@@ -89,33 +92,45 @@ export class FootballDataProvider implements SportsDataProvider {
     return "id" in payload ? [payload] : [];
   }
 
+  private async requestWithCache(path: string): Promise<SportsFixture[]> {
+    const key = path;
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < FootballDataProvider.CACHE_TTL) {
+      console.info(`[football-data.org] cache hit for ${path}`);
+      return cached.data;
+    }
+
+    const raw = await this.request(path);
+    const matches: SportsFixture[] = raw.map(normalize);
+    this.cache.set(key, { data: matches, timestamp: Date.now() });
+    return matches;
+  }
+
   async getFixtures(from: Date, to: Date, leagueId?: number): Promise<SportsFixture[]> {
     const start = from.toISOString().slice(0, 10);
     const end = to.toISOString().slice(0, 10);
     const matches = (await Promise.all(
       COMPETITION_CODES.map((code) =>
-        this.request(`/competitions/${code}/matches?dateFrom=${start}&dateTo=${end}`),
+        this.requestWithCache(`/competitions/${code}/matches?dateFrom=${start}&dateTo=${end}`),
       ),
     )).flat();
     return matches
-      .map(normalize)
       .filter((fixture) => leagueId === undefined || fixture.leagueId === leagueId);
   }
 
   async getFixtureById(fixtureId: number): Promise<SportsFixture | null> {
-    const matches = await this.request(`/matches/${fixtureId}`);
-    const fixture = matches[0] ? normalize(matches[0]) : null;
-    return fixture && COMPETITIONS.has(matches[0]?.competition?.code ?? "") ? fixture : null;
+    const matches = await this.requestWithCache(`/matches/${fixtureId}`);
+    const fixture = matches[0] ? matches[0] : null;
+    return fixture && COMPETITIONS.has(fixture.leagueId?.toString() ?? "") ? fixture : null;
   }
 
   async getLiveMatches(leagueId?: number): Promise<SportsFixture[]> {
     const matches = (await Promise.all(
       COMPETITION_CODES.map((code) =>
-        this.request(`/competitions/${code}/matches?status=IN_PLAY,PAUSED`),
+        this.requestWithCache(`/competitions/${code}/matches?status=IN_PLAY,PAUSED`),
       ),
     )).flat();
     return matches
-      .map(normalize)
       .filter((fixture) => leagueId === undefined || fixture.leagueId === leagueId);
   }
 

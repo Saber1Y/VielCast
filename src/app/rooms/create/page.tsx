@@ -63,9 +63,18 @@ function CreateRoomForm() {
 
   useEffect(() => {
     fetch("/api/txline/fixtures")
-      .then((r) => r.json())
-      .then(setFixtures)
-      .catch(() => {});
+      .then((r) => {
+        if (!r.ok) throw new Error(`Fixtures API ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) setFixtures(data);
+        else console.warn("Fixtures API returned non-array:", data);
+      })
+      .catch((err) => {
+        console.error("Fixtures fetch error:", err);
+        setFixtures([]);
+      });
   }, []);
 
   const selected = fixtures.find((f) => f.id === Number(selectedFixture));
@@ -254,9 +263,9 @@ function CreateRoomForm() {
           </p>
           <button
             onClick={() => connect().catch((e) => setError(e instanceof Error ? e.message : "Connection failed"))}
-            className="mt-6 rounded-lg bg-green-accent px-6 py-2.5 text-sm font-semibold text-pitch transition-colors hover:bg-green-accent/90"
+            className="mt-6 rounded-lg bg-zinc-800 px-6 py-2.5 text-sm font-semibold text-zinc-400 transition-colors hover:bg-zinc-700"
           >
-            Connect with Lace
+            Connect Wallet
           </button>
           {walletError && (
             <p className="mt-3 text-xs text-red-400">{walletError}</p>

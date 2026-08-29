@@ -27,10 +27,10 @@ export function WalletButton() {
         connect().catch(() => {}).finally(() => setConnecting(false));
       }}
       disabled={connecting || status === "connecting"}
-      title={error ?? "Connect Lace wallet"}
-      className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-emerald-400 transition-colors"
+      title={error ?? "Connect wallet"}
+      className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-zinc-700 transition-colors"
     >
-      {connecting || status === "connecting" ? "Connecting..." : "Connect Lace"}
+      {connecting || status === "connecting" ? "Connecting..." : "Connect Wallet"}
     </button>
   );
 }

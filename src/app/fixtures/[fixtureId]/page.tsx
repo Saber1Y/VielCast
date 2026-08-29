@@ -61,7 +61,9 @@ export default function FixtureDetailPage() {
     async function load() {
       try {
         const res = await fetch("/api/txline/fixtures");
+        if (!res.ok) throw new Error(`Fixtures API ${res.status}`);
         const fixtures: FixtureInfo[] = await res.json();
+        if (!Array.isArray(fixtures)) throw new Error("Fixtures API returned non-array");
         const match = fixtures.find((f) => f.id === Number(fixtureId));
         if (match) setFixture(match);
       } catch (e) {
